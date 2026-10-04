@@ -1,0 +1,16 @@
+# Sample Home Assistant configuration for local development
+homeassistant:
+  name: Home
+  unit_system: metric
+  time_zone: Europe/Berlin
+
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml
+
+mqtt:
+  broker: 192.168.1.10
+  password: !secret mqtt_password
+
+logger:
+  default: warning

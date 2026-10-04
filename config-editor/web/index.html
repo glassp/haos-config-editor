@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Config Editor</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%2303a9f4'/%3E%3Cpath d='M7 8l-3 4 3 4M17 8l3 4-3 4M13 7l-2 10' stroke='white' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E" />
+  </head>
+  <body>
+    <div id="app">
+      <header id="topbar">
+        <button id="btn-files" class="icon-btn" aria-label="Files"></button>
+        <div id="tabs" role="tablist"></div>
+        <button id="btn-problems" class="chip" aria-label="Problems" hidden></button>
+        <button id="btn-save" class="icon-btn" aria-label="Save"></button>
+        <button id="btn-menu" class="icon-btn" aria-label="Menu"></button>
+      </header>
+      <main id="editor">
+        <div id="empty" class="empty">
+          <p>Open a file from the file list.</p>
+          <button id="btn-open-files" class="btn primary">Browse files</button>
+        </div>
+      </main>
+      <nav id="keybar" aria-label="Editing keys" hidden></nav>
+      <div id="drawer-scrim" class="drawer-scrim"></div>
+      <aside id="drawer" aria-label="Files">
+        <div class="drawer-head">
+          <strong>Files</strong>
+          <span class="grow"></span>
+          <button id="btn-search" class="icon-btn" aria-label="Search"></button>
+          <button id="btn-new" class="icon-btn" aria-label="New file"></button>
+          <button id="btn-refresh" class="icon-btn" aria-label="Refresh"></button>
+        </div>
+        <div id="tree"></div>
+      </aside>
+      <div id="sheet-root"></div>
+      <div id="toast" class="toast" role="status"></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

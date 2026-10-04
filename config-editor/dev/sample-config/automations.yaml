@@ -1,0 +1,18 @@
+- id: '1700000000001'
+  alias: Kitchen light at sunset
+  description: Turn on the kitchen light when the sun sets
+  mode: single
+  trigger:
+    - platform: sun
+      event: sunset
+      offset: '-00:30:00'
+  condition:
+    - condition: state
+      entity_id: person.alex
+      state: home
+  action:
+    - service: light.turn_on
+      target:
+        entity_id: light.kitchen
+      data:
+        brightness_pct: 60
