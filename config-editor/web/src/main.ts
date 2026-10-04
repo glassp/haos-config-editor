@@ -70,6 +70,7 @@ const view = new EditorView({ parent: editorHost, state: EditorState.create({ do
 view.dom.style.display = 'none';
 view.dom.classList.add('cm-host');
 
+const parentOf = (p: string) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '');
 const isDirty = (f: OpenFile) => !f.state.doc.eq(f.saved);
 const current = () => (activePath ? files.get(activePath) ?? null : null);
 
@@ -87,29 +88,88 @@ syncViewport();
 document.documentElement.style.setProperty('--editor-font', `${prefs.fontSize}px`);
 
 // ----------------------------------------------------------------------- tabs
-const tabsEl = $('tabs');
+// Phones show the current file as a title plus a Chrome-style tab switcher button.
+// Wide screens additionally show up to QUICK_TABS tabs (pinned first, then most recent).
+const QUICK_TABS = 5;
+const pinned = new Set<string>(JSON.parse(store.get('pinned') ?? '[]') as string[]);
+let mru: string[] = [];
+const persistPinned = () => store.set('pinned', JSON.stringify([...pinned]));
+const baseName = (p: string) => p.split('/').pop()!;
+
+function quickTabs(): OpenFile[] {
+  const all = [...files.values()];
+  const rank = (f: OpenFile) => (pinned.has(f.path) ? -1 : mru.indexOf(f.path) === -1 ? 999 : mru.indexOf(f.path));
+  let chosen = [...all].sort((a, b) => rank(a) - rank(b)).slice(0, QUICK_TABS);
+  const act = current();
+  if (act && !chosen.includes(act)) chosen = [...chosen.slice(0, QUICK_TABS - 1), act];
+  return all.filter((f) => chosen.includes(f)); // keep stable (opening) order
+}
 
 function renderTabs() {
-  tabsEl.replaceChildren(
-    ...[...files.values()].map((f) => {
-      const name = f.path.split('/').pop()!;
-      return h(
-        'div',
-        { class: `tab${f.path === activePath ? ' active' : ''}`, role: 'tab', 'aria-selected': f.path === activePath },
-        h('button', { class: 'tab-main', title: f.path, onclick: () => activate(f.path) }, isDirty(f) ? h('span', { class: 'dot' }) : null, name),
-        h('button', { class: 'tab-close', 'aria-label': `Close ${name}`, onclick: () => void closeFile(f.path) }, icon('close', 14)),
-      );
-    }),
-  );
-  tabsEl.querySelector('.tab.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   const f = current();
+  const n = files.size;
+
+  $('title-name').textContent = f ? baseName(f.path) : '';
+  $('title-path').textContent = f ? parentOf(f.path) || '/config' : '';
+  $('title-dot').hidden = !f || !isDirty(f);
+  $('title-pin').hidden = !f || !pinned.has(f.path);
+  $('title-pin').replaceChildren(...(f && pinned.has(f.path) ? [icon('pin', 12)] : []));
+  $('doc-title').hidden = !f;
+  $('btn-tabs').hidden = n === 0;
+  $('tabs-count').textContent = n > 99 ? ':D' : String(n);
+
+  $('tabstrip').replaceChildren(
+    ...quickTabs().map((t) =>
+      h(
+        'div',
+        { class: `tab${t.path === activePath ? ' active' : ''}`, role: 'tab', 'aria-selected': t.path === activePath },
+        h('button', { class: 'tab-main', title: t.path, onclick: () => activate(t.path) },
+          isDirty(t) ? h('span', { class: 'dot' }) : null,
+          pinned.has(t.path) ? icon('pin', 12) : null,
+          baseName(t.path)),
+        h('button', { class: 'tab-close', 'aria-label': `Close ${baseName(t.path)}`, onclick: () => void closeFile(t.path) }, icon('close', 14)),
+      ),
+    ),
+  );
+
   $('btn-save').toggleAttribute('disabled', !f || !isDirty(f) || meta.readOnly);
   $('btn-save').classList.toggle('attention', !!f && isDirty(f));
   $('keybar').hidden = !f;
   $('empty').style.display = f ? 'none' : '';
   view.dom.style.display = f ? '' : 'none';
-  document.title = f ? `${isDirty(f) ? '• ' : ''}${f.path.split('/').pop()} – Config Editor` : 'Config Editor';
+  document.title = f ? `${isDirty(f) ? '• ' : ''}${baseName(f.path)} – Config Editor` : 'Config Editor';
 }
+
+/** The popup always lists every open tab; pinned ones get their own section on top. */
+function tabsSheet() {
+  const body = h('div', { class: 'tabs-list' });
+  const handle = openSheet('Open tabs', body, { wide: true });
+  const row = (f: OpenFile) =>
+    h('div', { class: `tab-row${f.path === activePath ? ' active' : ''}` },
+      h('button', { class: 'tab-row-main', onclick: () => { handle.close(); activate(f.path); } },
+        icon('file', 18),
+        h('span', { class: 'grow' },
+          h('span', { class: 'tab-row-name' }, isDirty(f) ? h('span', { class: 'dot' }) : null, baseName(f.path)),
+          h('span', { class: 'doc-path' }, parentOf(f.path) || '/config')),
+      ),
+      h('button', { class: `icon-btn sm pin-btn${pinned.has(f.path) ? ' on' : ''}`, 'aria-label': pinned.has(f.path) ? 'Unpin' : 'Pin',
+        onclick: () => { pinned.has(f.path) ? pinned.delete(f.path) : pinned.add(f.path); persistPinned(); renderTabs(); draw(); } }, icon('pin', 18)),
+      h('button', { class: 'icon-btn sm', 'aria-label': 'Close tab', onclick: async () => { await closeFile(f.path); if (!files.size) handle.close(); else draw(); } }, icon('close', 18)),
+    );
+  const draw = () => {
+    const all = [...files.values()];
+    const pins = all.filter((f) => pinned.has(f.path));
+    const rest = all.filter((f) => !pinned.has(f.path));
+    body.replaceChildren(
+      ...(pins.length ? [h('h3', {}, 'Pinned'), ...pins.map(row)] : []),
+      ...(rest.length ? [h('h3', {}, pins.length ? 'Other tabs' : 'Tabs'), ...rest.map(row)] : []),
+      ...(rest.length > 1 ? [h('button', { class: 'btn block', onclick: async () => { for (const f of rest) await closeFile(f.path); if (!files.size) handle.close(); else draw(); } }, 'Close all unpinned')] : []),
+    );
+  };
+  draw();
+}
+$('btn-tabs').addEventListener('click', tabsSheet);
+$('doc-title').addEventListener('click', tabsSheet);
 
 function onEditorUpdate(u: ViewUpdate) {
   const f = current();
@@ -165,6 +225,7 @@ function activate(path: string, line?: number) {
   const prev = current();
   if (prev && prev !== f) prev.state = view.state;
   activePath = path;
+  mru = [path, ...mru.filter((p) => p !== path)];
   view.setState(f.state);
   applyPrefs();
   if (line) {
@@ -220,6 +281,9 @@ async function closeFile(path: string) {
     if (choice === 'save' && !(await save(path))) return;
   }
   store.del(`draft:${path}`);
+  pinned.delete(path);
+  persistPinned();
+  mru = mru.filter((p) => p !== path);
   const keys = [...files.keys()];
   const idx = keys.indexOf(path);
   files.delete(path);
@@ -427,7 +491,6 @@ drawerScrim.addEventListener('click', closeDrawer);
 
 const tree = createTree($('tree'), { open: (p) => void openFile(p), actions: (e) => entryMenu(e) });
 
-const parentOf = (p: string) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '');
 const join = (dir: string, name: string) => (dir ? `${dir}/${name}` : name);
 
 async function createEntry(dir: string, type: 'file' | 'dir') {

@@ -46,6 +46,7 @@ const P: Record<string, string> = {
   home: 'M3 12l9-8 9 8M5 10v10h14V10',
   trash: 'M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14',
   edit: 'M4 20h4L19 9l-4-4L4 16z',
+  pin: 'M12 17v5M8 3h8l-1 7 3 3H6l3-3z',
 };
 
 export function icon(name: string, size = 20): SVGSVGElement {

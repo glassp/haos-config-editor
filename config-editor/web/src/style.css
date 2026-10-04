@@ -23,6 +23,9 @@
   --syn-punct: #6b7280;
   --syn-jinja: #b4530a;
   --safe-b: env(safe-area-inset-bottom, 0px);
+  --radius: 14px;
+  --shadow: 0 1px 2px #0000000d, 0 6px 20px #0000001a;
+  --glass: color-mix(in srgb, var(--bg-elev) 82%, transparent);
   --app-h: 100dvh;
 }
 @media (prefers-color-scheme: dark) {
@@ -68,12 +71,6 @@ button:disabled { opacity: 0.4; cursor: default; }
 .icon-btn.sm { width: 36px; height: 36px; }
 .icon-btn:active, .key:active, .menu-item:active, .tree-row:active { background: var(--selection); }
 #btn-save.attention { color: var(--accent); }
-#tabs { flex: 1; display: flex; overflow-x: auto; scrollbar-width: none; gap: 4px; min-width: 0; }
-#tabs::-webkit-scrollbar { display: none; }
-.tab { display: flex; align-items: center; flex: none; max-width: 200px; min-width: 0; border-radius: 10px; border: 1px solid transparent; }
-.tab.active { background: var(--bg); border-color: var(--border); }
-.tab-main { min-width: 0; flex: 1; display: flex; align-items: center; gap: 6px; padding: 10px 4px 10px 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
-.tab-close { width: 32px; height: 40px; display: grid; place-items: center; color: var(--fg-dim); }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: none; }
 .chip { display: inline-flex; align-items: center; gap: 4px; height: 36px; padding: 0 10px; border-radius: 18px; font-size: 13px; font-weight: 600; flex: none; background: var(--bg); border: 1px solid var(--border); }
 .chip.bad { color: var(--danger); border-color: var(--danger); }
@@ -154,3 +151,63 @@ h3 { margin: 8px 0 0; font-size: 14px; color: var(--fg-dim); text-transform: upp
 .cm-panel.cm-search button { border: 1px solid var(--border); background: var(--bg); padding: 0 12px; }
 .cm-panel.cm-search label { display: inline-flex; align-items: center; gap: 4px; font-size: 14px; }
 .cm-panel.cm-search [name='close'] { position: absolute; top: 4px; right: 4px; border: 0; font-size: 22px; }
+
+/* ============================================================ modern layer */
+body { letter-spacing: -0.005em; }
+#topbar { background: var(--glass); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent); gap: 4px; padding-inline: 6px; position: relative; z-index: 5; }
+.icon-btn { border-radius: 12px; transition: background 0.12s, transform 0.08s; }
+.icon-btn:active, .key:active { transform: scale(0.94); }
+
+.doc-title { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; padding: 4px 10px; border-radius: 12px; text-align: left; line-height: 1.2; }
+.doc-title:active { background: var(--selection); }
+.doc-name { display: flex; align-items: center; gap: 6px; font-weight: 650; font-size: 16px; max-width: 100%; }
+.doc-name > span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-path { font-size: 12px; color: var(--fg-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; display: block; }
+
+.tabstrip { display: none; }
+.tabs-btn { flex: none; width: 44px; height: 44px; display: grid; place-items: center; }
+.tabs-btn span { display: grid; place-items: center; min-width: 26px; height: 26px; padding: 0 4px; border: 2px solid var(--fg); border-radius: 8px; font: 700 13px system-ui, sans-serif; }
+.tabs-btn:active span { background: var(--selection); }
+
+@media (min-width: 900px) {
+  .doc-title { display: none; }
+  .tabstrip { display: flex; flex: 1; min-width: 0; gap: 6px; overflow: hidden; }
+  .tab { display: flex; align-items: center; min-width: 0; max-width: 220px; flex: 0 1 auto; border-radius: 10px; border: 1px solid transparent; }
+  .tab:hover { background: var(--selection); }
+  .tab.active { background: var(--bg); border-color: var(--border); box-shadow: var(--shadow); }
+  .tab-main { min-width: 0; display: flex; align-items: center; gap: 6px; padding: 8px 4px 8px 12px; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tab-close { width: 28px; height: 32px; display: grid; place-items: center; color: var(--fg-dim); border-radius: 8px; }
+  .tab-close:hover { color: var(--fg); }
+  #topbar { padding-top: 4px; }
+}
+
+.tabs-list { display: flex; flex-direction: column; gap: 4px; }
+.tabs-list h3 { margin: 10px 4px 2px; }
+.tab-row { display: flex; align-items: center; gap: 2px; border-radius: var(--radius); border: 1px solid transparent; background: var(--bg-elev); }
+.tab-row.active { border-color: var(--accent); }
+.tab-row-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 10px 6px 10px 14px; text-align: left; }
+.tab-row-name { display: flex; align-items: center; gap: 6px; font-weight: 600; }
+.pin-btn { color: var(--fg-dim); }
+.pin-btn.on { color: var(--accent); }
+.pin-btn.on svg { fill: currentColor; }
+
+/* softer, rounder surfaces */
+.chip { border-radius: 999px; background: color-mix(in srgb, currentColor 10%, transparent); border-color: transparent; }
+#btn-save { transition: background 0.15s, color 0.15s; }
+#btn-save.attention { background: var(--accent); color: var(--accent-fg); }
+#keybar { background: var(--glass); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); gap: 4px; padding-top: 6px; }
+.key { background: color-mix(in srgb, var(--fg) 7%, transparent); border-radius: 10px; }
+.sep { background: transparent; width: 6px; }
+#drawer { border-radius: 0 20px 20px 0; box-shadow: var(--shadow); }
+.drawer-head { background: transparent; border-bottom: 0; padding-top: 10px; }
+.tree-row { margin: 1px 8px; border-radius: 10px; }
+.tree-row.active { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.tree-row.active .tree-name { font-weight: 600; }
+.sheet { border-radius: 24px 24px 0 0; box-shadow: var(--shadow); border: 0; }
+.sheet-head h2 { font-size: 18px; font-weight: 700; }
+.menu-item { border-radius: 12px; }
+.btn { border-radius: 12px; }
+.field { border-radius: 12px; }
+.empty { font-size: 15px; }
+@media (min-width: 700px) { .sheet { border-radius: 22px; } }
+.toast { border-radius: 14px; box-shadow: var(--shadow); }

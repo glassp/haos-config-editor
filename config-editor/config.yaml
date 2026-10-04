@@ -1,5 +1,5 @@
 name: Config Editor
-version: "0.1.1"
+version: "0.2.0"
 slug: config_editor
 description: Mobile-first file editor for your Home Assistant configuration, with HA-aware completion and validation.
 url: https://github.com/glassp/haos-config-editor

@@ -11,8 +11,13 @@
     <div id="app">
       <header id="topbar">
         <button id="btn-files" class="icon-btn" aria-label="Files"></button>
-        <div id="tabs" role="tablist"></div>
+        <button id="doc-title" class="doc-title" aria-label="Open tabs" hidden>
+          <span class="doc-name"><span id="title-dot" class="dot" hidden></span><span id="title-name"></span><span id="title-pin" hidden></span></span>
+          <span id="title-path" class="doc-path"></span>
+        </button>
+        <div id="tabstrip" class="tabstrip" role="tablist"></div>
         <button id="btn-problems" class="chip" aria-label="Problems" hidden></button>
+        <button id="btn-tabs" class="tabs-btn" aria-label="All tabs" hidden><span id="tabs-count">0</span></button>
         <button id="btn-save" class="icon-btn" aria-label="Save"></button>
         <button id="btn-menu" class="icon-btn" aria-label="Menu"></button>
       </header>
