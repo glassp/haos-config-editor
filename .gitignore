@@ -5,3 +5,5 @@ dist/
 .dev-config/
 .dev-data/
 config-editor/server/public/
+__pycache__/
+*.pyc
