@@ -1,0 +1,1 @@
+{"defs":{},"schema":{"additionalProperties":false,"properties":{"default_interface":{"type":["boolean","string","integer"]},"ipv6":{"type":["boolean","string","integer"]}},"type":"object"}}

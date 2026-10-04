@@ -1,0 +1,1 @@
+{"defs":{},"schema":{"additionalProperties":false,"properties":{"api_key":{"type":["string","number","boolean"]},"domain":{"type":["string","number","boolean"]},"sandbox":{"type":["boolean","string","integer"]}},"required":["api_key","domain"],"type":"object"}}

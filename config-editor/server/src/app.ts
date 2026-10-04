@@ -138,6 +138,11 @@ export function createApp(cfg: Config, ha: HaClient = createHaClient(cfg), setti
 
   app.use('/api', api);
   app.use('/api', (_req, _res, next) => next(new HttpError(404, 'Not found')));
+  // Generated integration schemas only change with the add-on version.
+  app.use('/schemas', (_req, res, next) => {
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    next();
+  });
   app.use(express.static(cfg.publicDir, { index: 'index.html', maxAge: 0 }));
 
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {

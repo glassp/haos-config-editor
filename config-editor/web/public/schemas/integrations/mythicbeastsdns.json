@@ -1,0 +1,1 @@
+{"defs":{},"schema":{"additionalProperties":false,"properties":{"domain":{"type":["string","number","boolean"]},"host":{"type":["string","number","boolean"]},"password":{"type":["string","number","boolean"]},"scan_interval":{"type":["string","number","object"]}},"required":["domain","host","password"],"type":"object"}}

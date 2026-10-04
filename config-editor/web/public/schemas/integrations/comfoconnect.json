@@ -1,0 +1,1 @@
+{"defs":{},"schema":{"additionalProperties":false,"properties":{"host":{"type":["string","number","boolean"]},"name":{"type":["string","number","boolean"]},"pin":{"minimum":0,"type":["integer","string"]},"token":{"maxItems":32,"maxLength":32,"minItems":32,"minLength":32},"user_agent":{"type":["string","number","boolean"]}},"required":["host"],"type":"object"}}

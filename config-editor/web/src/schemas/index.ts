@@ -1,4 +1,5 @@
-import { automationsFile, configurationFile, scenesFile, scriptsFile } from './ha';
+import { automationsFile, scenesFile, scriptsFile } from './ha';
+import { registry } from './registry';
 
 export interface SchemaMatch {
   schema: object;
@@ -34,6 +35,6 @@ export function schemaFor(path: string, custom: Record<string, object> = {}): Sc
   if (base === 'automations.yaml') return { schema: automationsFile, id: 'automations' };
   if (base === 'scripts.yaml') return { schema: scriptsFile, id: 'scripts' };
   if (base === 'scenes.yaml') return { schema: scenesFile, id: 'scenes' };
-  if (rel === 'configuration.yaml' || rel.startsWith('packages/')) return { schema: configurationFile, id: 'configuration' };
+  if (rel === 'configuration.yaml' || rel.startsWith('packages/')) return { schema: registry.root(), id: `configuration:${registry.revision}` };
   return null;
 }

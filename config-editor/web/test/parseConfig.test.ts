@@ -1,10 +1,12 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { EditorState } from '@codemirror/state';
 import { CompletionContext } from '@codemirror/autocomplete';
 import { findDirective, parseDirectivePath, schemaContext } from '../src/ha/parseConfig';
 import { resolvePath } from '../src/ha/schemaWalk';
 import { validateYaml } from '../src/ha/validate';
-import { filePathFacet, yamlCompletions } from '../src/ha/complete';
+import { filePathFacet, completeYaml as yamlCompletions } from '../src/ha/complete';
+import { registry } from '../src/schemas/registry';
+import { useBundledSchemas } from './helpers';
 import { ctx } from '../src/ha/context';
 import { configurationFile } from '../src/schemas/ha';
 
@@ -32,6 +34,11 @@ const userRoot = {
     ...(configurationFile as { properties: object }).properties,
   },
 };
+
+beforeAll(async () => {
+  useBundledSchemas();
+  await registry.ensure(['logger', 'notify', 'homeassistant']);
+});
 
 const messages = (text: string, file = '/config/entities/bedroom.yaml') => validateYaml(text, file, ctx).map((p) => p.message);
 const withUser = () => (ctx.customSchemas = { 'configuration.yaml': userRoot });
@@ -73,8 +80,9 @@ describe('schema resolution', () => {
     expect(resolvePath(userRoot, ['missing'])).toBeNull();
   });
   it('resolves built-in HA paths', () => {
-    expect(resolvePath(configurationFile, ['logger', 'logs'])).toBeTruthy();
-    expect(resolvePath(configurationFile, ['automation', 'action'])).toBeTruthy(); // through the list of automations
+    const root = registry.root();
+    expect(resolvePath(root, ['logger', 'logs'])).toBeTruthy();
+    expect(resolvePath(root, ['automation', 'action'])).toBeTruthy(); // through the list of automations
   });
   it('gives every bracket spelling the same schema', () => {
     const a = schemaContext('# parse_config: entities[i]\n', '/config/x.yaml');
@@ -108,6 +116,7 @@ describe('validation with parse_config', () => {
   });
   it('uses the built-in configuration schema, including its lists', () => {
     expect(messages('# parse_config: logger.logs\nhomeassistant.core: debug\nx: shouting\n')[0]).toMatch(/Must be one of/);
+    expect(messages('# parse_config: logger.logs\nhomeassistant.core: DEBUG\nother: Warning\n')).toEqual([]);
     expect(messages('# parse_config: logger.logs\nhomeassistant.core: debug\n')).toEqual([]);
     expect(messages('# parse_config: automation\n- alias: a\n  trigger: []\n  action: []\n')).toEqual([]);
     expect(messages('# parse_config: automation\n- alias: a\n  triger: []\n  action: []\n').join()).toMatch(/did you mean "trigger"/);
@@ -141,7 +150,7 @@ describe('completion with parse_config', () => {
   });
   it('completes the directive path itself', () => {
     withUser();
-    expect(labels('# parse_config: |')).toEqual(expect.arrayContaining(['entities', 'foo', 'logger']));
+    expect(labels('# parse_config: |')).toEqual(expect.arrayContaining(['entities', 'foo', 'automation']));
     expect(labels('# parse_config: foo.|')).toEqual(['bar']);
     expect(labels('# parse_config: entities.|')).toEqual(expect.arrayContaining(['entity_id', 'configuration']));
   });

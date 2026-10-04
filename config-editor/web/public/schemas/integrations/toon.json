@@ -1,0 +1,1 @@
+{"defs":{},"schema":{"additionalProperties":false,"properties":{"client_id":{"type":["string","number","boolean"]},"client_secret":{"type":["string","number","boolean"]},"scan_interval":{"type":["string","number","object"]}},"required":["client_id","client_secret"],"type":"object"}}

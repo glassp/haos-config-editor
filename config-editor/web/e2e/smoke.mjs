@@ -54,16 +54,20 @@ await page.waitForSelector('.cm-tooltip-autocomplete');
 check((await page.textContent('.cm-tooltip-autocomplete')).includes('brightness_pct'), 'service field autocomplete');
 await page.keyboard.press('Escape');
 
-// copy / paste through the toolbar
-await page.keyboard.press('Control+a');
-await page.tap('button[data-tip^="Copy"]');
-const clip = await page.evaluate(() => navigator.clipboard.readText());
-check(clip.includes('brightness_pct') === false && clip.includes('service: light.turn_on'), 'toolbar copy writes selection to clipboard');
+// toolbar: undo / redo / indent / outdent only
+const keyLabels = await page.$$eval('#keybar button', (bs) => bs.map((b) => b.dataset.tip.split(':')[0].split(' ')[0]));
+check(keyLabels.join() === 'Undo,Redo,Indent,Outdent', `toolbar has only undo, redo, indent, outdent (${keyLabels.join()})`);
 await page.keyboard.press('Control+End');
-await page.tap('button[data-tip^="Paste"]');
-await page.waitForTimeout(300);
-await page.screenshot({ path: `${out}/4b-paste.png` });
-check((await page.textContent('.cm-content')).split('light.turn_on').length > 2, 'toolbar paste inserts clipboard text');
+await page.keyboard.insertText('\nx: 1');
+check((await page.textContent('.cm-content')).includes('x: 1'), 'typed text present');
+await page.tap('button[data-tip^="Undo"]');
+check(!(await page.textContent('.cm-content')).includes('x: 1'), 'undo button reverts the change');
+await page.tap('button[data-tip^="Redo"]');
+check((await page.textContent('.cm-content')).includes('x: 1'), 'redo button re-applies it');
+await page.tap('button[data-tip^="Indent"]');
+check((await page.textContent('.cm-content')).includes('  x: 1'), 'indent button indents the line');
+await page.tap('button[data-tip^="Outdent"]');
+check(!(await page.textContent('.cm-content')).includes('  x: 1'), 'outdent button outdents the line');
 
 // save (revert first so the sample stays valid)
 await page.tap('#btn-menu');

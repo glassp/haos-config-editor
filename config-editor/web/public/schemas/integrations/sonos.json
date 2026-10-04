@@ -1,0 +1,1 @@
+{"defs":{},"schema":{"additionalProperties":false,"properties":{"media_player":{"additionalProperties":false,"properties":{"advertise_addr":{"type":["string","number","boolean"]},"hosts":{"items":{"type":["string","number","boolean"]},"type":"array"},"interface_addr":{"type":["string","number","boolean"]}},"type":"object"}},"type":"object"}}

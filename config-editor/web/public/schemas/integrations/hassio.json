@@ -1,0 +1,1 @@
+{"defs":{},"schema":{"additionalProperties":false,"properties":{"development_repo":{"type":"string"}},"type":"object"}}

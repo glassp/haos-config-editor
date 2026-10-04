@@ -1,0 +1,1 @@
+{"defs":{},"schema":{"additionalProperties":false,"properties":{"api_key":{"type":["string","number","boolean"]},"id":{"type":"integer"},"whitelist":{"type":["string","number","boolean"]}},"required":["api_key","id","whitelist"],"type":"object"}}

@@ -2,6 +2,7 @@ import { api, type VisibilityRule } from '../api';
 import { compileVisibility } from '../../../server/src/visibility';
 import { h, icon } from './dom';
 import { confirmDialog, toast } from './sheet';
+import { registry } from '../schemas/registry';
 
 export interface EditorPrefs {
   wrap: boolean;
@@ -144,6 +145,7 @@ export async function openSettings(deps: SettingsDeps): Promise<void> {
       h('section', { class: 'card' },
         h('h2', {}, 'Status'),
         h('div', { class: 'setting-row' }, h('span', { class: 'grow' }, 'Home Assistant API'), h('span', { class: deps.meta.haConnected ? 'ok-text' : 'bad-text' }, deps.meta.haConnected ? 'Connected' : 'Not connected')),
+        h('div', { class: 'setting-row' }, h('span', { class: 'grow' }, 'Integration schemas'), h('span', {}, registry.haVersion ? `${Object.keys(registry.index).length} integrations · HA ${registry.haVersion}` : 'Not loaded')),
         h('div', { class: 'setting-row' }, h('span', { class: 'grow' }, 'Editing'), h('span', {}, deps.meta.readOnly ? 'Read-only' : 'Enabled')),
         h('p', { class: 'help' }, 'Folders that can be opened, read-only mode and the size limit are add-on options (Settings → Add-ons → Config Editor → Configuration).')),
     ),

@@ -4,6 +4,7 @@ import { ctx, type HaContext } from './context';
 import { CONFIG_ROOT_FILE, configRel, schemaFor } from '../schemas';
 import { descend, enumValues, propertiesOf, resolvePath } from './schemaWalk';
 import { fullPath, parseDirectivePath, schemaContext } from './parseConfig';
+import { prepareSchemas } from './prepare';
 import { HA_TAG_NAMES } from './tags';
 import { ITEM, pathFor, parseLine, siblingKeys, siblingScalars, type PathPart } from './yamlPath';
 
@@ -76,7 +77,8 @@ function lastKey(path: PathPart[]): string | null {
   return null;
 }
 
-export function yamlCompletions(context: CompletionContext): CompletionResult | null {
+/** Synchronous core: uses whatever schemas are loaded. */
+export function completeYaml(context: CompletionContext): CompletionResult | null {
   const { state, pos } = context;
   const line = state.doc.lineAt(pos);
   const before = line.text.slice(0, pos - line.from);
@@ -232,7 +234,7 @@ function keyOptions(filePath: string, text: string, path: PathPart[], at: number
   if (sc) {
     const nodes = descend(sc.root as never, fullPath(sc, path));
     for (const [k, p] of propertiesOf(nodes, sc.root as never, siblings)) {
-      out.push({ label: k, type: 'property', info: p.description, apply: `${k}: ` });
+      out.push({ label: k, type: 'property', ...(path.length === 0 && !sc.prefix.length ? { detail: p.description } : { info: p.description }), apply: `${k}: ` });
     }
   }
 
@@ -248,6 +250,15 @@ function keyOptions(filePath: string, text: string, path: PathPart[], at: number
   const unique = new Map<string, Completion>();
   for (const o of out) if (!unique.has(o.label)) unique.set(o.label, o);
   return [...unique.values()];
+}
+
+/** Loads the integration schemas the document needs, then completes. */
+export async function yamlCompletions(context: CompletionContext): Promise<CompletionResult | null> {
+  const { state, pos } = context;
+  const line = state.doc.lineAt(pos);
+  const dm = /^[ \t]*#[ \t]*parse_config[ \t]*:[ \t]*([\w-]+)\./.exec(line.text.slice(0, pos - line.from));
+  await prepareSchemas(state.doc.toString(), state.facet(filePathFacet), dm ? [dm[1]] : []);
+  return completeYaml(context);
 }
 
 export const haAutocomplete = () =>

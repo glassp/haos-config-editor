@@ -1,0 +1,1 @@
+{"defs":{},"schema":{"additionalProperties":false,"properties":{"password":{"type":["string","number","boolean"]},"username":{"type":["string","number","boolean"]}},"required":["username","password"],"type":"object"}}

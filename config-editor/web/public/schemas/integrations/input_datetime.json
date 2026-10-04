@@ -1,0 +1,1 @@
+{"defs":{},"schema":{"additionalProperties":{"additionalProperties":false,"properties":{"has_date":{"type":["boolean","string","integer"]},"has_time":{"type":["boolean","string","integer"]},"icon":{"type":"string"},"initial":{"type":["string","number","boolean"]},"name":{"type":["string","number","boolean"]}},"type":"object"},"type":"object"}}

@@ -245,3 +245,6 @@ body { letter-spacing: -0.005em; }
 .switch:checked::after { transform: translateX(20px); }
 .ok-text { color: var(--ok); font-weight: 600; } .bad-text { color: var(--warn); font-weight: 600; }
 .tree-empty { color: var(--fg-dim); font-size: 13px; padding: 4px 0; }
+
+#keybar { justify-content: center; gap: 10px; }
+.key { min-width: 56px; }

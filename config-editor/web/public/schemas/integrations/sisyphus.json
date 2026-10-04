@@ -1,0 +1,1 @@
+{"defs":{},"schema":{"anyOf":[{"type":"object"},{"items":{"additionalProperties":false,"properties":{"host":{"type":["string","number","boolean"]},"name":{"type":["string","number","boolean"]}},"required":["name","host"],"type":"object"},"type":"array"}]}}

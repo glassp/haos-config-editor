@@ -2,10 +2,10 @@ import './style.css';
 import { EditorState, Text } from '@codemirror/state';
 import { EditorView, type ViewUpdate } from '@codemirror/view';
 import { forEachDiagnostic } from '@codemirror/lint';
-import { selectAll, undo, redo, indentMore, indentLess, selectLine } from '@codemirror/commands';
+import { undo, redo, indentMore, indentLess } from '@codemirror/commands';
 import { openSearchPanel } from '@codemirror/search';
 import { api, ApiError, type Entry } from './api';
-import { copyText, readText } from './clipboard';
+import { copyText } from './clipboard';
 import { addKnownPath, onContextChange, refreshContext } from './ha/context';
 import { createState, forceLinting, gutters, gutterCompartment, wrapCompartment } from './editor';
 import { confirmDialog, menuSheet, openSheet, promptDialog, toast, type MenuItem } from './ui/sheet';
@@ -392,112 +392,21 @@ function exec(fn: (v: EditorView) => unknown) {
   fn(view);
   view.focus();
 }
-function insert(text: string) {
-  view.dispatch(view.state.replaceSelection(text), { scrollIntoView: true, userEvent: 'input.type' });
-  view.focus();
-}
-function selectionText(): string {
-  const { state } = view;
-  return state.selection.ranges.filter((r) => !r.empty).map((r) => state.sliceDoc(r.from, r.to)).join('\n');
-}
-async function doCopy(cut: boolean) {
-  const { state } = view;
-  let text = selectionText();
-  let range: { from: number; to: number } | null = null;
-  if (!text) {
-    // Like VS Code: an empty selection copies the whole line.
-    const l = state.doc.lineAt(state.selection.main.head);
-    text = l.text + '\n';
-    range = { from: l.from, to: Math.min(state.doc.length, l.to + 1) };
-  }
-  const ok = await copyText(text);
-  if (!ok) return toast('Copy blocked by browser — use long-press → Copy', 'error');
-  if (cut) {
-    if (range) view.dispatch({ changes: range, userEvent: 'delete.cut' });
-    else view.dispatch(state.replaceSelection(''), { userEvent: 'delete.cut' });
-  }
-  toast(cut ? 'Cut' : 'Copied');
-  view.focus();
-}
-async function doPaste() {
-  let text = await readText();
-  if (text === null) {
-    // No programmatic access (plain http, denied permission): ask the user to paste into a field.
-    text = await promptDialog('Paste text', '', 'Insert', true);
-    if (!text) return view.focus();
-  }
-  view.dispatch(view.state.replaceSelection(text), { scrollIntoView: true, userEvent: 'input.paste' });
-  view.focus();
-}
-function moveCursor(dx: number, dy: number) {
-  const sel = view.state.selection.main;
-  const r = dy ? view.moveVertically(sel, dy > 0) : view.moveByChar(sel, dx > 0);
-  view.dispatch({ selection: r, scrollIntoView: true });
-  view.focus();
-}
-
-type Key = { icon?: string; label?: string; tip: string; run: () => void; cls?: string } | '|';
-const SYMBOLS: Record<string, string> = {
-  ':': 'Insert a colon (separates a key from its value)',
-  '-': 'Insert a dash (starts a list item)',
-  '"': 'Insert a pair of double quotes',
-  "'": 'Insert a pair of single quotes',
-  '[': 'Insert [ (starts an inline list)',
-  ']': 'Insert ] (ends an inline list)',
-  '{': 'Insert { (starts an inline map or a template)',
-  '}': 'Insert } (ends an inline map or a template)',
-  '!': 'Insert ! (YAML tags such as !secret and !include)',
-  '#': 'Insert # (starts a comment)',
-  _: 'Insert an underscore',
-  '/': 'Insert a slash',
-  '%': 'Insert % (template blocks use {% … %})',
-  '|': 'Insert | (multi-line text block that keeps line breaks)',
-  '>': 'Insert > (multi-line text block that folds line breaks)',
-  '*': 'Insert * (refers to a YAML anchor)',
-  '&': 'Insert & (defines a YAML anchor)',
-};
-const keys: Key[] = [
+const keybar = $('keybar');
+// Selecting, copying and pasting use the phone's native text handles and menu; the bar only
+// carries what the OS cannot do for us.
+const keys: { icon: string; tip: string; run: () => void }[] = [
   { icon: 'undo', tip: 'Undo the last change', run: () => exec(undo) },
   { icon: 'redo', tip: 'Redo the change you undid', run: () => exec(redo) },
-  '|',
-  { icon: 'copy', tip: 'Copy the selection (the current line if nothing is selected)', run: () => void doCopy(false) },
-  { icon: 'cut', tip: 'Cut the selection (the current line if nothing is selected)', run: () => void doCopy(true) },
-  { icon: 'paste', tip: 'Paste from the clipboard', run: () => void doPaste() },
-  { icon: 'selectall', tip: 'Select the whole file', run: () => exec(selectAll) },
-  { label: 'Ln', tip: 'Select the current line', run: () => exec(selectLine) },
-  '|',
-  { icon: 'indent', tip: 'Indent the selected lines', run: () => exec(indentMore) },
-  { icon: 'outdent', tip: 'Outdent the selected lines', run: () => exec(indentLess) },
-  '|',
-  { icon: 'left', tip: 'Move the cursor left (hold to repeat)', run: () => moveCursor(-1, 0), cls: 'rep' },
-  { icon: 'right', tip: 'Move the cursor right (hold to repeat)', run: () => moveCursor(1, 0), cls: 'rep' },
-  { icon: 'up', tip: 'Move the cursor up (hold to repeat)', run: () => moveCursor(0, -1), cls: 'rep' },
-  { icon: 'down', tip: 'Move the cursor down (hold to repeat)', run: () => moveCursor(0, 1), cls: 'rep' },
-  '|',
-  ...Object.keys(SYMBOLS).map((c): Key => ({ label: c, tip: SYMBOLS[c], run: () => insert(c === '"' || c === "'" ? c + c : c) })),
+  { icon: 'indent', tip: 'Indent: move the selected lines one level right', run: () => exec(indentMore) },
+  { icon: 'outdent', tip: 'Outdent: move the selected lines one level left', run: () => exec(indentLess) },
 ];
-const keybar = $('keybar');
 for (const k of keys) {
-  if (k === '|') {
-    keybar.append(h('span', { class: 'sep' }));
-    continue;
-  }
-  const b = h('button', { class: `key ${k.cls ?? ''}`, tip: k.tip, ...(k.cls === 'rep' ? { 'data-tip-notouch': true } : {}) }, k.icon ? icon(k.icon, 20) : k.label);
-  keepFocus(b);
-  let timer: number | undefined;
-  const stop = () => clearInterval(timer);
+  const b = h('button', { class: 'key', tip: k.tip }, icon(k.icon, 22));
+  keepFocus(b); // keep the editor focused so the soft keyboard stays open
   b.addEventListener('click', k.run);
-  if (k.cls === 'rep') {
-    // Hold an arrow key to repeat (replaces the click handler for pointer input).
-    b.addEventListener('pointerdown', () => {
-      stop();
-      timer = window.setTimeout(() => (timer = window.setInterval(k.run, 60)), 350);
-    });
-    for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, stop);
-  }
   keybar.append(b);
 }
-// A closing quote/bracket button should still work when text is selected: wrap it.
 
 // ------------------------------------------------------------------ tree + menu
 const drawer = $('drawer');

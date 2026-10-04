@@ -138,6 +138,7 @@ export function enumValues(nodes: S[], root: S): string[] {
   for (const n of nodes) {
     for (const b of expand(n, root)) {
       for (const v of b.enum ?? []) out.add(String(v));
+      for (const v of b.examples ?? []) out.add(String(v)); // e.g. known `platform:` names, which are not exhaustive
       if ('const' in b) out.add(String(b.const));
       if (b.type === 'boolean' || (Array.isArray(b.type) && b.type.length === 1 && b.type[0] === 'boolean')) {
         out.add('true');

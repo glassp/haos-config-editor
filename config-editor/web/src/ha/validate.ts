@@ -70,12 +70,26 @@ function describe(e: SchemaError, allowedHere: string[]): string {
       return `Must be "${p.allowedValue}"`;
     case 'type':
       return `Expected ${Array.isArray(p.type) ? (p.type as string[]).join(' or ') : p.type}`;
-    case 'anyOf':
-      return 'Missing one of the required keys';
+    case 'anyOf': {
+      const branches = (e.schema.anyOf ?? []) as Schema[];
+      return branches.length && branches.every((b) => Object.keys(b).every((k) => k === 'required'))
+        ? 'Missing one of the required keys'
+        : "Value doesn't match any allowed form";
+    }
     case 'minimum':
       return `Must be at least ${p.limit}`;
     case 'maximum':
       return `Must be at most ${p.limit}`;
+    case 'pattern':
+      return 'Invalid format';
+    case 'minItems':
+      return `Needs at least ${p.limit} item(s)`;
+    case 'maxItems':
+      return `At most ${p.limit} item(s) allowed`;
+    case 'minLength':
+      return `Too short (at least ${p.limit} characters)`;
+    case 'maxLength':
+      return `Too long (at most ${p.limit} characters)`;
     case 'oneOf':
       return "Value doesn't match any allowed form";
     default:

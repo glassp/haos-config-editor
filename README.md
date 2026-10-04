@@ -14,11 +14,11 @@ clipboard toolbar for when you want one-tap actions.
 | | |
 |---|---|
 | **Syntax highlighting** | YAML (with `{{ jinja }}` templates and `!secret`/`!include` tags), JSON, Python, JS, Markdown, shell, ini, Jinja |
-| **Schema validation** | Built-in schemas for `automations.yaml`, `scripts.yaml`, `scenes.yaml`, `configuration.yaml` core keys and `packages/`; typo suggestions ("did you mean `trigger`?"); bring your own schemas per file glob |
+| **Schema validation** | Schemas **generated from Home Assistant itself** for 220 `configuration.yaml` integrations and all their platforms (`notify`, `sensor`, `light`, `mqtt`, `recorder`, `http`, `template`, …), plus hand-written ones for automations, scripts and scenes. Typo suggestions ("did you mean `trigger`?"), required keys, enums, ranges. Bring your own schemas per file glob |
 | **HA-aware checks** | Unknown entities and actions (from your live instance), missing `!secret` keys, missing `!include` targets, YAML syntax and duplicate keys |
 | **Auto-complete** | Schema-driven keys, entity IDs (with friendly names), actions/services and their data fields, `!secret` names, `!include` paths, loaded integrations, Jinja helpers |
-| **Copy / paste** | Native selection + toolbar (copy, cut, paste, select all/line, copy file/path). Falls back to a paste box on plain-http installs where the clipboard API is blocked |
-| **Mobile UI** | Bottom key bar above the keyboard (symbols `: - " [ ] { }`, indent, arrow keys with hold-to-repeat), tabs, file drawer, bottom sheets, safe-area aware, 16 px inputs (no iOS zoom) |
+| **Copy / paste** | Native text selection: long-press, drag the handles, use the system Cut/Copy/Paste menu. ⋮ → *Copy entire file* / *Copy file path* for the rest |
+| **Mobile UI** | Slim key bar above the keyboard (undo, redo, indent, outdent), tab switcher with pinned tabs, file drawer, bottom sheets, safe-area aware, 16 px inputs (no iOS zoom) |
 | **Safety** | Atomic saves, external-change conflict detection, per-file version history, unsaved drafts survive the browser killing the tab, `.storage` protected |
 | **Explorer** | Root is `/` (paths like `/config/configuration.yaml`); opens `configuration.yaml` by default; visibility rules in Settings |
 | **Tooltips** | Every toolbar action explains itself: hover on desktop, long-press on touch |
@@ -67,10 +67,23 @@ homeassistant.components.mqtt: debug
   `entities[item]` all mean `entities`, and `entities[i].configuration.options` resolves to
   `entities.configuration.options`. Lists are stepped through implicitly, so keys after a list address the list items.
 * A path that *ends* in `[...]` also accepts a file that holds a single item instead of the list.
-* The schema comes from the `/config/configuration.yaml` schema: the built-in one (`homeassistant`, `automation`,
-  `script`, `scene`, `logger`, `http`, `recorder`) or your own via `.ha-editor/schemas.json` (see below). An unknown
-  path produces a warning and the file is only syntax-checked.
+* The schema comes from the `/config/configuration.yaml` schema: the bundled one (every integration below) or your
+  own via `.ha-editor/schemas.json` (see below). An unknown path produces a warning and the file is only syntax-checked.
 * Typing `# parse_config: ` offers the available paths.
+
+## Integration schemas
+
+Home Assistant validates `configuration.yaml` with a Python schema (`CONFIG_SCHEMA` / `PLATFORM_SCHEMA`) inside every
+integration. `config-editor/tools/schemagen` converts those into JSON Schema and the result is bundled with the
+add-on (`web/public/schemas`, currently generated from HA 2026.2). Each integration's file is fetched only when your
+document uses that key. Entity platforms (`sensor:`, `notify:`, …) are validated per `platform:`; unknown platforms
+(e.g. custom components) are left alone.
+
+Fidelity: key names, nesting, required keys, enums, ranges and list-or-single forms are exact. Custom Python checks
+and cross-key rules cannot be expressed statically, so those are left unconstrained rather than risking false errors.
+`tools/schemagen/failures.json` lists the few obscure integrations that could not be imported when generating.
+Automations/scripts/scenes use hand-written schemas because HA validates their triggers and actions dynamically.
+Run `tools/schemagen/generate.sh` to refresh the bundle for a newer Home Assistant.
 
 ## Custom schemas
 

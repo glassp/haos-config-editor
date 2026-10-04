@@ -1,0 +1,1 @@
+{"defs":{},"schema":{"additionalProperties":false,"properties":{"latitude":{"maximum":90,"minimum":-90,"type":["number","string"]},"longitude":{"maximum":180,"minimum":-180,"type":["number","string"]},"radius":{"type":["number","string"]},"scan_interval":{"type":["string","number","object"]}},"type":"object"}}

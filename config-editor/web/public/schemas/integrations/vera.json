@@ -1,0 +1,1 @@
+{"defs":{},"schema":{"additionalProperties":false,"properties":{"exclude":{"items":{"type":["integer"]},"type":"array"},"lights":{"items":{"type":["integer"]},"type":"array"},"vera_controller_url":{"type":"string"}},"required":["vera_controller_url"],"type":"object"}}

@@ -1,0 +1,8 @@
+# parse_config: notify
+- platform: smtp
+  name: mail
+  server: smtp.example.org
+  port: 587
+  sender: ha@example.org
+  recipient:
+    - me@example.org

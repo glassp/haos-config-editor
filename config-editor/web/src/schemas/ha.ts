@@ -256,77 +256,18 @@ export const automationsFile = withDefs({ type: 'array', items: automation });
 export const scriptsFile = withDefs({ type: 'object', additionalProperties: script });
 export const scenesFile = withDefs({ type: 'array', items: scene });
 
-const logLevel = { enum: ['notset', 'debug', 'info', 'warning', 'warn', 'error', 'fatal', 'critical'] };
-
-const integrations: Record<string, S> = {
-  homeassistant: {
-    type: 'object',
-    properties: {
-      name: string,
-      latitude: numOrTemplate,
-      longitude: numOrTemplate,
-      elevation: numOrTemplate,
-      unit_system: { enum: ['metric', 'imperial', 'us_customary', 'si'] },
-      currency: string,
-      time_zone: string,
-      country: string,
-      language: string,
-      external_url: string,
-      internal_url: string,
-      customize: { type: 'object' },
-      customize_domain: { type: 'object' },
-      customize_glob: { type: 'object' },
-      packages: { type: ['object', 'string'] },
-      allowlist_external_dirs: { type: 'array', items: string },
-      allowlist_external_urls: { type: 'array', items: string },
-      media_dirs: { type: 'object' },
-      auth_providers: { type: 'array' },
-      legacy_templates: bool,
-      debug: bool,
-    },
-    additionalProperties: false,
-  },
+/** Hand-written schemas: HA validates triggers, conditions and actions dynamically, so nothing can be generated for these. */
+export const builtinIntegrations: Record<string, S> = {
   automation: { type: ['string', 'array'], items: automation },
   script: { type: ['string', 'object'], additionalProperties: script },
   scene: { type: ['string', 'array'], items: scene },
-  logger: {
-    type: 'object',
-    properties: { default: logLevel, logs: { type: 'object', additionalProperties: logLevel }, filters: { type: 'object' } },
-    additionalProperties: false,
-  },
-  http: {
-    type: 'object',
-    properties: {
-      server_port: { type: 'integer', minimum: 1, maximum: 65535 },
-      server_host: { type: ['string', 'array'] },
-      ssl_certificate: string,
-      ssl_key: string,
-      use_x_forwarded_for: bool,
-      trusted_proxies: { type: 'array', items: string },
-      cors_allowed_origins: { type: 'array', items: string },
-      ip_ban_enabled: bool,
-      login_attempts_threshold: { type: 'integer' },
-    },
-    additionalProperties: false,
-  },
-  recorder: {
-    type: 'object',
-    properties: {
-      db_url: string,
-      purge_keep_days: { type: 'integer', minimum: 1 },
-      auto_purge: bool,
-      auto_repack: bool,
-      commit_interval: { type: 'integer', minimum: 0 },
-      include: { type: 'object' },
-      exclude: { type: 'object' },
-    },
-    additionalProperties: false,
-  },
 };
+export const builtinDefs = defs;
 
+/** Fallback configuration.yaml schema when the generated integration schemas are not loaded. */
 export const configurationFile = withDefs({
   type: 'object',
-  properties: integrations,
-  // Every other key is an integration whose schema we do not know about.
+  properties: builtinIntegrations,
+  // Every other key is an integration whose schema is loaded on demand (see schemas/registry.ts).
   additionalProperties: true,
 });

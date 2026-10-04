@@ -1,0 +1,1 @@
+{"defs":{},"schema":{"additionalProperties":false,"properties":{"location_idx":{"minimum":0,"type":["integer","string"]},"password":{"type":["string","number","boolean"]},"scan_interval":{"minimum":"0:01:00","type":["string","number","object"]},"username":{"type":["string","number","boolean"]}},"required":["username","password"],"type":"object"}}

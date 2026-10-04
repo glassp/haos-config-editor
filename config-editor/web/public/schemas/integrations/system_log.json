@@ -1,0 +1,1 @@
+{"defs":{},"schema":{"additionalProperties":false,"properties":{"fire_event":{"type":["boolean","string","integer"]},"max_entries":{"minimum":0,"type":["integer","string"]}},"type":"object"}}

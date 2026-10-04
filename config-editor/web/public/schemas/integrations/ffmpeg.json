@@ -1,0 +1,1 @@
+{"defs":{},"schema":{"additionalProperties":false,"properties":{"ffmpeg_bin":{"type":["string","number","boolean"]}},"type":"object"}}

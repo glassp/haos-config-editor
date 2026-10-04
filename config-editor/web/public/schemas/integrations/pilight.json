@@ -1,0 +1,1 @@
+{"defs":{},"schema":{"additionalProperties":false,"properties":{"host":{"type":["string","number","boolean"]},"port":{"maximum":65535,"minimum":1,"type":["integer","string"]},"send_delay":{"type":["number","string"]},"whitelist":{"additionalProperties":{"items":{"type":["string","number","boolean"]},"type":"array"},"type":"object"}},"type":"object"}}

@@ -1,0 +1,1 @@
+{"defs":{},"schema":{"additionalProperties":false,"properties":{"installer_mode":{"type":["boolean","string","integer"]}},"type":"object"}}

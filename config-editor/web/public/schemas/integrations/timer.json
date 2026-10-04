@@ -1,0 +1,1 @@
+{"defs":{},"schema":{"additionalProperties":{"additionalProperties":false,"properties":{"duration":{"type":["string","number","object"]},"icon":{"type":"string"},"name":{"type":["string","number","boolean"]},"restore":{"type":["boolean","string","integer"]}},"type":"object"},"type":"object"}}

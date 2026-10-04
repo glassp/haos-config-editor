@@ -1,0 +1,1 @@
+{"defs":{},"schema":{"additionalProperties":false,"properties":{"token":{"type":["string","number","boolean"]}},"required":["token"],"type":"object"}}

@@ -1,0 +1,1 @@
+{"defs":{},"schema":{"additionalProperties":false,"properties":{"device_group":{"pattern":"^[A-Za-z0-9_]+\\.[A-Za-z0-9_]+$","type":"string"},"disable_turn_off":{"type":["boolean","string","integer"]},"light_group":{"type":["string","number","boolean"]},"light_profile":{"type":["string","number","boolean"]}},"type":"object"}}

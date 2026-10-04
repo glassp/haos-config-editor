@@ -1,0 +1,1 @@
+{"defs":{},"schema":{"additionalProperties":false,"properties":{"ignore_event":{"type":"array"},"publish_eventstream_received":{"type":["boolean","string","integer"]},"publish_topic":{},"subscribe_topic":{}},"type":"object"}}

@@ -22,6 +22,21 @@ function matchesType(t: string, v: unknown): boolean {
   return actual === t || (t === 'number' && actual === 'integer');
 }
 
+const reCache = new Map<string, RegExp | null>();
+/** Patterns come from Python (`re`); ones JavaScript cannot compile yield null and are ignored, never an error. */
+function matches(pattern: string, value: string): boolean | null {
+  let re = reCache.get(pattern);
+  if (re === undefined) {
+    try {
+      re = new RegExp(pattern);
+    } catch {
+      re = null;
+    }
+    reCache.set(pattern, re);
+  }
+  return re ? re.test(value) : null;
+}
+
 function deepEqual(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
@@ -60,20 +75,29 @@ function walk(schema: Schema | boolean, data: unknown, path: (string | number)[]
       return; // everything below assumes the right type
     }
   }
-  if (s.enum && !s.enum.some((e: unknown) => deepEqual(e, data))) fail('enum', { allowedValues: s.enum });
+  if (s.enum) {
+    // x-case-insensitive: HA upper/lower-cases the value before comparing (vol.Upper, vol.Lower)
+    const fold = s['x-case-insensitive'] && typeof data === 'string' ? data.toLowerCase() : null;
+    const ok = s.enum.some((e: unknown) => (fold !== null && typeof e === 'string' ? e.toLowerCase() === fold : deepEqual(e, data)));
+    if (!ok) fail('enum', { allowedValues: s.enum });
+  }
   if ('const' in s && !deepEqual(s.const, data)) fail('const', { allowedValue: s.const });
 
   if (typeof data === 'number') {
     if (s.minimum !== undefined && data < s.minimum) fail('minimum', { limit: s.minimum });
     if (s.maximum !== undefined && data > s.maximum) fail('maximum', { limit: s.maximum });
+    if (s.exclusiveMinimum !== undefined && data <= s.exclusiveMinimum) fail('minimum', { limit: s.exclusiveMinimum });
+    if (s.exclusiveMaximum !== undefined && data >= s.exclusiveMaximum) fail('maximum', { limit: s.exclusiveMaximum });
   }
   if (typeof data === 'string') {
     if (s.minLength !== undefined && data.length < s.minLength) fail('minLength', { limit: s.minLength });
-    if (s.pattern && !new RegExp(s.pattern).test(data)) fail('pattern', { pattern: s.pattern });
+    if (s.maxLength !== undefined && data.length > s.maxLength) fail('maxLength', { limit: s.maxLength });
+    if (s.pattern && matches(s.pattern, data) === false) fail('pattern', { pattern: s.pattern });
   }
 
   if (Array.isArray(data)) {
     if (s.minItems !== undefined && data.length < s.minItems) fail('minItems', { limit: s.minItems });
+    if (s.maxItems !== undefined && data.length > s.maxItems) fail('maxItems', { limit: s.maxItems });
     if (s.items && typeof s.items === 'object') data.forEach((item, i) => walk(s.items, item, [...path, i], out, root, depth + 1));
   } else if (data && typeof data === 'object') {
     const obj = data as Record<string, unknown>;
@@ -86,7 +110,7 @@ function walk(schema: Schema | boolean, data: unknown, path: (string | number)[]
         walk(props[k], v, [...path, k], out, root, depth + 1);
       }
       for (const [pattern, sub] of Object.entries<Schema>(s.patternProperties ?? {})) {
-        if (new RegExp(pattern).test(k)) {
+        if (matches(pattern, k) === true) {
           matched = true;
           walk(sub, v, [...path, k], out, root, depth + 1);
         }
@@ -99,7 +123,12 @@ function walk(schema: Schema | boolean, data: unknown, path: (string | number)[]
   }
 
   for (const sub of s.allOf ?? []) walk(sub, data, path, out, root, depth + 1);
-  if (s.anyOf && !s.anyOf.some((sub: Schema) => passes(sub, data, root, depth))) fail('anyOf');
+  if (s.anyOf && !s.anyOf.some((sub: Schema) => passes(sub, data, root, depth))) {
+    // If only one alternative fits the value's type, its errors are the useful ones.
+    const fitting = s.anyOf.filter((sub: Schema) => typeFits(sub, data, root));
+    if (fitting.length === 1) walk(fitting[0], data, path, out, root, depth + 1);
+    else fail('anyOf');
+  }
   if (s.oneOf && s.oneOf.filter((sub: Schema) => passes(sub, data, root, depth)).length !== 1) fail('oneOf');
   if (s.not && passes(s.not, data, root, depth)) fail('not');
   if (s.if) {
@@ -107,6 +136,13 @@ function walk(schema: Schema | boolean, data: unknown, path: (string | number)[]
       if (s.then) walk(s.then, data, path, out, root, depth + 1);
     } else if (s.else) walk(s.else, data, path, out, root, depth + 1);
   }
+}
+
+/** Does the schema's `type` admit this value (ignoring everything else)? Untyped schemas fit anything. */
+function typeFits(schema: Schema, data: unknown, root: Schema): boolean {
+  const s = schema.$ref ? resolveRef(schema.$ref, root) ?? schema : schema;
+  if (s.type === undefined) return true;
+  return (Array.isArray(s.type) ? s.type : [s.type]).some((t: string) => matchesType(t, data));
 }
 
 function passes(schema: Schema, data: unknown, root: Schema, depth: number) {

@@ -1,0 +1,1 @@
+{"defs":{},"schema":{"additionalProperties":false,"properties":{"host":{"type":["string","number","boolean"]},"password":{"type":["string","number","boolean"]},"port":{"type":["string","number","boolean"]},"ssl":{"type":["boolean","string","integer"]},"username":{"type":["string","number","boolean"]}},"required":["host"],"type":"object"}}

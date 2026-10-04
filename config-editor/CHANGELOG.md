@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0
+
+- Full integration schemas: `configuration.yaml` and `parse_config` fragments are now validated and completed against
+  schemas generated from Home Assistant itself (220 integrations incl. all entity platforms such as `notify`,
+  `sensor`, `light`; `homeassistant`, `http`, `recorder`, `logger`, `template`, `mqtt`, …). Fixes
+  "parse_config: no schema known for notify".
+- Toolbar reduced to Undo, Redo, Indent and Outdent (selection/copy/paste use the native phone controls).
+- Better validation messages (nullable values, one-of alternatives, case-insensitive enums such as log levels).
+
 ## 0.3.0
 
 - Explorer root is now `/` (paths are absolute, e.g. `/config/configuration.yaml`) and lists the Home Assistant

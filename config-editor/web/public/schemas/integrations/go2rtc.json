@@ -1,0 +1,1 @@
+{"defs":{},"schema":{"additionalProperties":false,"properties":{"debug_ui":{"type":["boolean","string","integer"]},"password":{"minItems":1,"minLength":1,"type":["string","number","boolean"]},"url":{"type":"string"},"username":{"minItems":1,"minLength":1,"type":["string","number","boolean"]}},"type":"object"}}

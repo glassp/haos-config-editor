@@ -28,6 +28,7 @@ import {
 } from '@codemirror/view';
 import { tags as t } from '@lezer/highlight';
 import { haAutocomplete, filePathFacet } from './ha/complete';
+import { prepareSchemas } from './ha/prepare';
 import { parseLine } from './ha/yamlPath';
 import { validateJson, validateYaml, type Problem } from './ha/validate';
 import { kindOf, languageFor } from './lang';
@@ -160,7 +161,14 @@ export function createState(o: EditorOptions): EditorState {
   const kind = kindOf(o.path);
   const lint =
     kind === 'yaml'
-      ? linter((view) => toDiagnostics(view, validateYaml(view.state.doc.toString(), o.path)), { delay: 400 })
+      ? linter(
+          async (view) => {
+            const text = view.state.doc.toString();
+            await prepareSchemas(text, o.path);
+            return toDiagnostics(view, validateYaml(text, o.path));
+          },
+          { delay: 400 },
+        )
       : kind === 'json'
         ? linter((view) => toDiagnostics(view, validateJson(view.state.doc.toString())), { delay: 400 })
         : [];

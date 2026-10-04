@@ -1,0 +1,1 @@
+{"defs":{},"schema":{"additionalProperties":false,"properties":{"api_url":{"type":["string","number","boolean"]},"ws_url":{"type":["string","number","boolean"]}},"required":["ws_url","api_url"],"type":"object"}}

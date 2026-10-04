@@ -63,7 +63,9 @@ const BASE = 'http://127.0.0.1:8099/';
   await page.waitForFunction(() => document.title.includes('configuration.yaml'));
 
   // long press on a toolbar button: tooltip, and the action must NOT run
-  const box = await page.locator('button.key[data-tip^="Select the whole file"]').boundingBox();
+  await page.locator('.cm-content').click();
+  await page.keyboard.insertText('zzz');
+  const box = await page.locator('button.key[data-tip^="Undo"]').boundingBox();
   const cdp = await ctx.newCDPSession(page);
   const touch = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts });
   const pt = [{ x: box.x + box.width / 2, y: box.y + box.height / 2 }];
@@ -71,14 +73,12 @@ const BASE = 'http://127.0.0.1:8099/';
   await page.waitForSelector('#tooltip.show', { timeout: 3000 });
   await touch('touchEnd', []);
   await page.waitForTimeout(150);
-  check((await page.textContent('#tooltip')).startsWith('Select the whole'), 'mobile: long-press shows the tooltip');
-  const selected = await page.evaluate(() => getSelection().toString().length);
-  check(selected === 0, 'mobile: long-press does not trigger the action');
+  check((await page.textContent('#tooltip')).startsWith('Undo'), 'mobile: long-press shows the tooltip');
+  check((await page.textContent('.cm-content')).includes('zzz'), 'mobile: long-press does not trigger the action');
   await page.screenshot({ path: `${out}/f3-longpress.png` });
   await page.waitForFunction(() => !document.querySelector('#tooltip.show'), null, { timeout: 4000 });
-  // a quick tap still runs the action
-  await page.tap('button.key[data-tip^="Select the whole file"]');
-  check(await page.evaluate(() => getSelection().toString().length > 10), 'mobile: normal tap still works');
+  await page.tap('button[data-tip^="Undo"]');
+  check(!(await page.textContent('.cm-content')).includes('zzz'), 'mobile: normal tap still runs the action');
 
   // parse_config fragment: opens with no problems, and typos are caught against the logger.logs schema
   await page.tap('#btn-files');
@@ -93,6 +93,12 @@ const BASE = 'http://127.0.0.1:8099/';
   await page.tap('#btn-problems');
   check((await page.textContent('.sheet')).includes('Must be one of'), 'parse_config: value validated against logger.logs schema');
   await page.screenshot({ path: `${out}/f4-parse-config.png` });
+  await page.keyboard.press('Escape');
+  await page.tap('#btn-files');
+  await page.tap('.tree-row:has-text("notify.yaml") .tree-main');
+  await page.waitForFunction(() => document.title.includes('notify.yaml'));
+  await page.waitForTimeout(1500);
+  check((await page.textContent('#btn-problems')).trim() === 'OK', 'parse_config: notify fragment validates against the notify/smtp schema');
   await ctx.close();
 }
 await browser.close();

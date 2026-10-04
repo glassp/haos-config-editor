@@ -1,6 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { registry } from '../src/schemas/registry';
+import { useBundledSchemas } from './helpers';
 import { validateYaml } from '../src/ha/validate';
 import type { HaContext } from '../src/ha/context';
+
+beforeAll(async () => {
+  useBundledSchemas();
+  await registry.ensure(['homeassistant']);
+});
 
 const base = (over: Partial<HaContext> = {}): HaContext => ({
   connected: true,

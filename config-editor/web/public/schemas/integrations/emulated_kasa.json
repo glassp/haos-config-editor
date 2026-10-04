@@ -1,0 +1,1 @@
+{"defs":{},"schema":{"additionalProperties":false,"properties":{"entities":{"additionalProperties":{"additionalProperties":false,"properties":{"name":{"type":["string","number","boolean"]},"power":{"type":["number","string","boolean"]},"power_entity":{"type":["string","number","boolean"]}},"type":"object"},"type":"object"}},"required":["entities"],"type":"object"}}

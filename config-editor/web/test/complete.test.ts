@@ -1,8 +1,15 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { EditorState } from '@codemirror/state';
 import { CompletionContext } from '@codemirror/autocomplete';
-import { filePathFacet, yamlCompletions } from '../src/ha/complete';
+import { filePathFacet, completeYaml as yamlCompletions } from '../src/ha/complete';
+import { registry } from '../src/schemas/registry';
+import { useBundledSchemas } from './helpers';
 import { ctx } from '../src/ha/context';
+
+beforeAll(async () => {
+  useBundledSchemas();
+  await registry.init();
+});
 
 ctx.entities = [
   { entity_id: 'light.kitchen', name: 'Kitchen', state: 'on' },

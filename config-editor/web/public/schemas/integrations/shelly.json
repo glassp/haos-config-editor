@@ -1,0 +1,1 @@
+{"defs":{},"schema":{"additionalProperties":false,"properties":{"coap_port":{"maximum":65535,"minimum":1,"type":["integer","string"]}},"type":"object"}}
