@@ -41,9 +41,57 @@ function resolveRef(ref: string, root: S): S | undefined {
     .reduce<S | undefined>((n, k) => n?.[k], root);
 }
 
-/** Schema node reached by following `path`, or [] when unknown. */
-export function descend(root: S, path: PathPart[]): S[] {
-  let nodes = expand(root, root);
+function deref(node: S | undefined, root: S): S | undefined {
+  if (!node || typeof node !== 'object') return undefined;
+  if (!node.$ref) return node;
+  const target = resolveRef(node.$ref, root);
+  const { $ref, ...rest } = node; // eslint-disable-line @typescript-eslint/no-unused-vars
+  return target ? { ...target, ...rest } : undefined;
+}
+
+/** Items schema of an array-ish node (including the then-branch of "one or a list" schemas). */
+export function itemsOf(node: S | undefined, root: S): S | undefined {
+  const n = deref(node, root);
+  return deref(n?.items, root) ?? deref(n?.then?.items, root);
+}
+
+function findChild(node: S | undefined, key: string, root: S, depth = 0): S | undefined {
+  const n = deref(node, root);
+  if (!n || depth > 8) return undefined;
+  if (n.properties?.[key]) return n.properties[key];
+  for (const [pattern, sub] of Object.entries<S>(n.patternProperties ?? {})) if (new RegExp(pattern).test(key)) return sub;
+  for (const k of ['allOf', 'anyOf', 'oneOf']) {
+    for (const b of n[k] ?? []) {
+      const r = findChild(b, key, root, depth + 1);
+      if (r) return r;
+    }
+  }
+  for (const b of [n.then, n.else]) {
+    const r = b && findChild(b, key, root, depth + 1);
+    if (r) return r;
+  }
+  if (n.additionalProperties && typeof n.additionalProperties === 'object') return n.additionalProperties;
+  // A list: keys address the items' properties ("entities.xyz" means entities[].xyz).
+  const items = itemsOf(n, root);
+  return items ? findChild(items, key, root, depth + 1) : undefined;
+}
+
+/**
+ * Resolve a dotted key path (as written in a `parse_config` directive, brackets already removed)
+ * to a single schema node. Lists are stepped through implicitly.
+ */
+export function resolvePath(root: S, segments: string[]): S | null {
+  let node: S | undefined = root;
+  for (const seg of segments) {
+    node = findChild(node, seg, root);
+    if (!node) return null;
+  }
+  return deref(node, root) ?? null;
+}
+
+/** Schema nodes reached by following `path`, or [] when unknown. ITEM steps into list items. */
+export function descend(root: S, path: PathPart[], start: S = root): S[] {
+  let nodes = expand(start, root);
   for (const part of path) {
     const next: S[] = [];
     for (const n of nodes) {
@@ -56,7 +104,15 @@ export function descend(root: S, path: PathPart[]): S[] {
         next.push(...expand(n.additionalProperties, root));
       }
     }
-    // Branches of a oneOf/if-then that were passed through by `expand` are already included.
+    if (!next.length) {
+      // implicit list step: "entities" followed by a key means the key of the items
+      for (const n of nodes) {
+        for (const item of expand(n.items, root)) {
+          if (item.properties?.[part]) next.push(...expand(item.properties[part], root));
+          else if (item.additionalProperties && typeof item.additionalProperties === 'object') next.push(...expand(item.additionalProperties, root));
+        }
+      }
+    }
     nodes = next;
     if (!nodes.length) break;
   }

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.0
+
+- Explorer root is now `/` (paths are absolute, e.g. `/config/configuration.yaml`) and lists the Home Assistant
+  folders `/config`, `/share`, `/ssl`, `/media`, `/addon_configs`, `/addons`. The editor opens
+  `/config/configuration.yaml` by default.
+- New Settings page: explorer visibility rules (show/hide by glob; last match wins; hidden paths stay available to
+  includes, secrets and validation), editor preferences, status.
+- Tooltips on every toolbar action: hover on desktop, long-press on touch.
+- `# parse_config: <path>` directive: validate and complete a file as a fragment of `configuration.yaml`
+  (dot notation, list markers `[...]` ignored).
+- Add-on: new `allowed_roots` option replaces `show_hidden`; additional folders are mapped (config, share, media,
+  ssl read-only, addon_configs, addons).
+
 ## 0.2.0
 
 - New tab model: phones show the file name as a title plus a Chrome-style tab switcher; wide screens show

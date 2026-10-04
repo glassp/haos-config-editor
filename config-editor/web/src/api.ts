@@ -20,6 +20,15 @@ export interface FieldDef {
   selector?: unknown;
 }
 
+export interface VisibilityRule {
+  mode: 'show' | 'hide';
+  pattern: string;
+}
+
+export interface Settings {
+  visibility: VisibilityRule[];
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -60,6 +69,8 @@ export const api = {
   history: (path: string) => call<{ versions: { id: string; size: number }[] }>('GET', `api/history?${q({ path })}`),
   historyVersion: (path: string, id: string) =>
     call<{ content: string }>('GET', `api/history/version?${q({ path, id })}`),
+  settings: () => call<Settings>('GET', 'api/settings'),
+  saveSettings: (s: Settings) => call<Settings>('PUT', 'api/settings', s),
   secrets: () => call<{ keys: string[] }>('GET', 'api/secrets'),
   schemas: () => call<{ schemas: Record<string, object> }>('GET', 'api/schemas'),
   haContext: () => call<HaContextData>('GET', 'api/ha/context'),

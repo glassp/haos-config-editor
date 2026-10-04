@@ -3,12 +3,26 @@ import { h, icon } from './dom';
 
 export interface TreeHandlers {
   open: (path: string) => void;
-  actions: (entry: Entry | { path: ''; type: 'dir'; name: string }) => void;
+  actions: (entry: Entry) => void;
 }
 
-/** Lazy file tree. Directories load on first expand. */
+export const ROOT = '/';
+const DEFAULT_EXPANDED = ['/config'];
+
+function loadExpanded(): Set<string> {
+  try {
+    const raw = localStorage.getItem('tree:expanded');
+    if (raw === null) return new Set(DEFAULT_EXPANDED);
+    // older versions stored config-relative paths; those no longer apply
+    return new Set((JSON.parse(raw) as string[]).filter((p) => p.startsWith('/')));
+  } catch {
+    return new Set(DEFAULT_EXPANDED);
+  }
+}
+
+/** Lazy file tree rooted at "/". Directories load on first expand. */
 export function createTree(container: HTMLElement, handlers: TreeHandlers) {
-  const expanded = new Set<string>(JSON.parse(localStorage.getItem('tree:expanded') ?? '[]') as string[]);
+  const expanded = loadExpanded();
   const cache = new Map<string, Entry[]>();
   let active = '';
 
@@ -35,6 +49,7 @@ export function createTree(container: HTMLElement, handlers: TreeHandlers) {
       into.append(h('div', { class: 'tree-error' }, (e as Error).message));
       return;
     }
+    if (!entries.length) into.append(h('div', { class: 'tree-empty', style: `padding-left:${28 + depth * 14}px` }, 'Empty'));
     for (const e of entries) {
       const row = h(
         'div',
@@ -44,7 +59,7 @@ export function createTree(container: HTMLElement, handlers: TreeHandlers) {
           icon(e.type === 'dir' ? 'folder' : 'file', 18),
           h('span', { class: 'tree-name' }, e.name),
         ),
-        h('button', { class: 'icon-btn sm', 'aria-label': `Actions for ${e.name}`, onclick: () => handlers.actions(e) }, icon('more', 18)),
+        h('button', { class: 'icon-btn sm', tip: `Actions for ${e.name}`, onclick: () => handlers.actions(e) }, icon('more', 18)),
       );
       into.append(row);
       if (e.type === 'dir' && expanded.has(e.path)) {
@@ -66,7 +81,7 @@ export function createTree(container: HTMLElement, handlers: TreeHandlers) {
   async function render() {
     const top = container.scrollTop;
     const frag = h('div');
-    await renderDir('', 0, frag);
+    await renderDir(ROOT, 0, frag);
     container.replaceChildren(frag);
     container.scrollTop = top;
   }
@@ -84,10 +99,10 @@ export function createTree(container: HTMLElement, handlers: TreeHandlers) {
       container.querySelectorAll('.tree-row').forEach((r) => r.classList.toggle('active', r.getAttribute('data-path') === path));
     },
     reveal(path: string) {
-      const parts = path.split('/').slice(0, -1);
+      const parts = path.split('/').filter(Boolean).slice(0, -1);
       let acc = '';
       for (const p of parts) {
-        acc = acc ? `${acc}/${p}` : p;
+        acc = `${acc}/${p}`;
         expanded.add(acc);
       }
       persist();

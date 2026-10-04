@@ -11,6 +11,8 @@ import { createState, forceLinting, gutters, gutterCompartment, wrapCompartment 
 import { confirmDialog, menuSheet, openSheet, promptDialog, toast, type MenuItem } from './ui/sheet';
 import { h, icon, keepFocus } from './ui/dom';
 import { createTree } from './ui/tree';
+import { initTooltips } from './ui/tooltips';
+import { openSettings } from './ui/settings';
 
 // ---------------------------------------------------------------- preferences
 interface Prefs {
@@ -70,7 +72,9 @@ const view = new EditorView({ parent: editorHost, state: EditorState.create({ do
 view.dom.style.display = 'none';
 view.dom.classList.add('cm-host');
 
-const parentOf = (p: string) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '');
+// Paths are absolute within the editor's virtual root: '/config/packages/a.yaml'.
+const parentOf = (p: string) => (p.lastIndexOf('/') <= 0 ? '/' : p.slice(0, p.lastIndexOf('/')));
+const DEFAULT_FILE = '/config/configuration.yaml';
 const isDirty = (f: OpenFile) => !f.state.doc.eq(f.saved);
 const current = () => (activePath ? files.get(activePath) ?? null : null);
 
@@ -110,7 +114,7 @@ function renderTabs() {
   const n = files.size;
 
   $('title-name').textContent = f ? baseName(f.path) : '';
-  $('title-path').textContent = f ? parentOf(f.path) || '/config' : '';
+  $('title-path').textContent = f ? parentOf(f.path) : '';
   $('title-dot').hidden = !f || !isDirty(f);
   $('title-pin').hidden = !f || !pinned.has(f.path);
   $('title-pin').replaceChildren(...(f && pinned.has(f.path) ? [icon('pin', 12)] : []));
@@ -123,11 +127,11 @@ function renderTabs() {
       h(
         'div',
         { class: `tab${t.path === activePath ? ' active' : ''}`, role: 'tab', 'aria-selected': t.path === activePath },
-        h('button', { class: 'tab-main', title: t.path, onclick: () => activate(t.path) },
+        h('button', { class: 'tab-main', tip: t.path, onclick: () => activate(t.path) },
           isDirty(t) ? h('span', { class: 'dot' }) : null,
           pinned.has(t.path) ? icon('pin', 12) : null,
           baseName(t.path)),
-        h('button', { class: 'tab-close', 'aria-label': `Close ${baseName(t.path)}`, onclick: () => void closeFile(t.path) }, icon('close', 14)),
+        h('button', { class: 'tab-close', tip: `Close ${baseName(t.path)}`, onclick: () => void closeFile(t.path) }, icon('close', 14)),
       ),
     ),
   );
@@ -150,11 +154,11 @@ function tabsSheet() {
         icon('file', 18),
         h('span', { class: 'grow' },
           h('span', { class: 'tab-row-name' }, isDirty(f) ? h('span', { class: 'dot' }) : null, baseName(f.path)),
-          h('span', { class: 'doc-path' }, parentOf(f.path) || '/config')),
+          h('span', { class: 'doc-path' }, parentOf(f.path))),
       ),
-      h('button', { class: `icon-btn sm pin-btn${pinned.has(f.path) ? ' on' : ''}`, 'aria-label': pinned.has(f.path) ? 'Unpin' : 'Pin',
+      h('button', { class: `icon-btn sm pin-btn${pinned.has(f.path) ? ' on' : ''}`, tip: pinned.has(f.path) ? 'Unpin: remove from the quick-switch tabs' : 'Pin: keep this tab in the quick-switch tabs',
         onclick: () => { pinned.has(f.path) ? pinned.delete(f.path) : pinned.add(f.path); persistPinned(); renderTabs(); draw(); } }, icon('pin', 18)),
-      h('button', { class: 'icon-btn sm', 'aria-label': 'Close tab', onclick: async () => { await closeFile(f.path); if (!files.size) handle.close(); else draw(); } }, icon('close', 18)),
+      h('button', { class: 'icon-btn sm', tip: 'Close this tab', onclick: async () => { await closeFile(f.path); if (!files.size) handle.close(); else draw(); } }, icon('close', 18)),
     );
   const draw = () => {
     const all = [...files.values()];
@@ -163,7 +167,7 @@ function tabsSheet() {
     body.replaceChildren(
       ...(pins.length ? [h('h3', {}, 'Pinned'), ...pins.map(row)] : []),
       ...(rest.length ? [h('h3', {}, pins.length ? 'Other tabs' : 'Tabs'), ...rest.map(row)] : []),
-      ...(rest.length > 1 ? [h('button', { class: 'btn block', onclick: async () => { for (const f of rest) await closeFile(f.path); if (!files.size) handle.close(); else draw(); } }, 'Close all unpinned')] : []),
+      ...(rest.length > 1 ? [h('button', { class: 'btn block', tip: 'Close every tab that is not pinned', onclick: async () => { for (const f of rest) await closeFile(f.path); if (!files.size) handle.close(); else draw(); } }, 'Close all unpinned')] : []),
     );
   };
   draw();
@@ -432,26 +436,45 @@ function moveCursor(dx: number, dy: number) {
   view.focus();
 }
 
-type Key = { icon?: string; label?: string; title: string; run: () => void; cls?: string } | '|';
+type Key = { icon?: string; label?: string; tip: string; run: () => void; cls?: string } | '|';
+const SYMBOLS: Record<string, string> = {
+  ':': 'Insert a colon (separates a key from its value)',
+  '-': 'Insert a dash (starts a list item)',
+  '"': 'Insert a pair of double quotes',
+  "'": 'Insert a pair of single quotes',
+  '[': 'Insert [ (starts an inline list)',
+  ']': 'Insert ] (ends an inline list)',
+  '{': 'Insert { (starts an inline map or a template)',
+  '}': 'Insert } (ends an inline map or a template)',
+  '!': 'Insert ! (YAML tags such as !secret and !include)',
+  '#': 'Insert # (starts a comment)',
+  _: 'Insert an underscore',
+  '/': 'Insert a slash',
+  '%': 'Insert % (template blocks use {% … %})',
+  '|': 'Insert | (multi-line text block that keeps line breaks)',
+  '>': 'Insert > (multi-line text block that folds line breaks)',
+  '*': 'Insert * (refers to a YAML anchor)',
+  '&': 'Insert & (defines a YAML anchor)',
+};
 const keys: Key[] = [
-  { icon: 'undo', title: 'Undo', run: () => exec(undo) },
-  { icon: 'redo', title: 'Redo', run: () => exec(redo) },
+  { icon: 'undo', tip: 'Undo the last change', run: () => exec(undo) },
+  { icon: 'redo', tip: 'Redo the change you undid', run: () => exec(redo) },
   '|',
-  { icon: 'copy', title: 'Copy', run: () => void doCopy(false) },
-  { icon: 'cut', title: 'Cut', run: () => void doCopy(true) },
-  { icon: 'paste', title: 'Paste', run: () => void doPaste() },
-  { icon: 'selectall', title: 'Select all', run: () => exec(selectAll) },
-  { label: 'Ln', title: 'Select line', run: () => exec(selectLine) },
+  { icon: 'copy', tip: 'Copy the selection (the current line if nothing is selected)', run: () => void doCopy(false) },
+  { icon: 'cut', tip: 'Cut the selection (the current line if nothing is selected)', run: () => void doCopy(true) },
+  { icon: 'paste', tip: 'Paste from the clipboard', run: () => void doPaste() },
+  { icon: 'selectall', tip: 'Select the whole file', run: () => exec(selectAll) },
+  { label: 'Ln', tip: 'Select the current line', run: () => exec(selectLine) },
   '|',
-  { icon: 'indent', title: 'Indent', run: () => exec(indentMore) },
-  { icon: 'outdent', title: 'Outdent', run: () => exec(indentLess) },
+  { icon: 'indent', tip: 'Indent the selected lines', run: () => exec(indentMore) },
+  { icon: 'outdent', tip: 'Outdent the selected lines', run: () => exec(indentLess) },
   '|',
-  { icon: 'left', title: 'Left', run: () => moveCursor(-1, 0), cls: 'rep' },
-  { icon: 'right', title: 'Right', run: () => moveCursor(1, 0), cls: 'rep' },
-  { icon: 'up', title: 'Up', run: () => moveCursor(0, -1), cls: 'rep' },
-  { icon: 'down', title: 'Down', run: () => moveCursor(0, 1), cls: 'rep' },
+  { icon: 'left', tip: 'Move the cursor left (hold to repeat)', run: () => moveCursor(-1, 0), cls: 'rep' },
+  { icon: 'right', tip: 'Move the cursor right (hold to repeat)', run: () => moveCursor(1, 0), cls: 'rep' },
+  { icon: 'up', tip: 'Move the cursor up (hold to repeat)', run: () => moveCursor(0, -1), cls: 'rep' },
+  { icon: 'down', tip: 'Move the cursor down (hold to repeat)', run: () => moveCursor(0, 1), cls: 'rep' },
   '|',
-  ...[':', '-', '"', "'", '[', ']', '{', '}', '!', '#', '_', '/', '%', '|', '>', '*', '&'].map((c): Key => ({ label: c, title: `Insert ${c}`, run: () => insert(c === '"' || c === "'" ? c + c : c) })),
+  ...Object.keys(SYMBOLS).map((c): Key => ({ label: c, tip: SYMBOLS[c], run: () => insert(c === '"' || c === "'" ? c + c : c) })),
 ];
 const keybar = $('keybar');
 for (const k of keys) {
@@ -459,7 +482,7 @@ for (const k of keys) {
     keybar.append(h('span', { class: 'sep' }));
     continue;
   }
-  const b = h('button', { class: `key ${k.cls ?? ''}`, title: k.title, 'aria-label': k.title }, k.icon ? icon(k.icon, 20) : k.label);
+  const b = h('button', { class: `key ${k.cls ?? ''}`, tip: k.tip, ...(k.cls === 'rep' ? { 'data-tip-notouch': true } : {}) }, k.icon ? icon(k.icon, 20) : k.label);
   keepFocus(b);
   let timer: number | undefined;
   const stop = () => clearInterval(timer);
@@ -491,7 +514,8 @@ drawerScrim.addEventListener('click', closeDrawer);
 
 const tree = createTree($('tree'), { open: (p) => void openFile(p), actions: (e) => entryMenu(e) });
 
-const join = (dir: string, name: string) => (dir ? `${dir}/${name}` : name);
+const join = (dir: string, name: string) => (dir === '/' ? `/${name}` : `${dir}/${name}`);
+const depth = (p: string) => p.split('/').filter(Boolean).length;
 
 async function createEntry(dir: string, type: 'file' | 'dir') {
   const name = await promptDialog(type === 'file' ? 'New file' : 'New folder', '', 'Create');
@@ -508,13 +532,22 @@ async function createEntry(dir: string, type: 'file' | 'dir') {
   }
 }
 
-function entryMenu(e: Entry | { path: ''; type: 'dir'; name: string }) {
+/** The folder new files go into: next to the open file, else /config. */
+function newMenu() {
+  const dir = activePath ? parentOf(activePath) : '/config';
+  menuSheet(`New in ${dir}`, [
+    { label: 'New file', icon: 'plus', run: () => createEntry(dir, 'file') },
+    { label: 'New folder', icon: 'folder', run: () => createEntry(dir, 'dir') },
+  ]);
+}
+
+function entryMenu(e: Entry) {
   const dir = e.type === 'dir' ? e.path : parentOf(e.path);
   const items: (MenuItem | null)[] = [
     { label: 'New file here', icon: 'plus', run: () => createEntry(dir, 'file') },
     { label: 'New folder here', icon: 'folder', run: () => createEntry(dir, 'dir') },
   ];
-  if (e.path) {
+  if (depth(e.path) >= 2) {
     items.push(
       null,
       {
@@ -568,15 +601,27 @@ function entryMenu(e: Entry | { path: ''; type: 'dir'; name: string }) {
       },
     );
   }
-  menuSheet(e.path || 'Config folder', items);
+  menuSheet(e.path, items);
 }
 
 $('btn-files').addEventListener('click', openDrawer);
 $('btn-open-files').addEventListener('click', openDrawer);
 $('btn-refresh').addEventListener('click', () => void refreshAll());
-$('btn-new').addEventListener('click', () => entryMenu({ path: '', type: 'dir', name: '' }));
+$('btn-new').addEventListener('click', newMenu);
+$('btn-settings').addEventListener('click', () => void showSettings());
 $('btn-search').addEventListener('click', () => searchSheet());
 $('btn-save').addEventListener('click', () => void save());
+
+function showSettings() {
+  closeDrawer();
+  return openSettings({
+    prefs,
+    savePrefs,
+    applyPrefs: () => (current() ? applyPrefs() : document.documentElement.style.setProperty('--editor-font', `${prefs.fontSize}px`)),
+    meta,
+    onVisibilityChanged: () => void tree.refresh(),
+  });
+}
 
 async function refreshAll() {
   await Promise.all([tree.refresh(), refreshContext()]);
@@ -706,6 +751,7 @@ $('btn-menu').addEventListener('click', () => {
     f ? { label: 'Copy file path', icon: 'copy', run: async () => void ((await copyText(f.path)) && toast('Path copied')) } : null,
     { label: 'Home Assistant tools', icon: 'home', run: haSheet },
     null,
+    { label: 'Settings', icon: 'settings', run: () => void showSettings() },
     toggle('Wrap long lines', 'wrap'),
     toggle('Line numbers', 'lineNumbers'),
     toggle('Auto-save', 'autosave'),
@@ -736,15 +782,21 @@ async function boot() {
   $('btn-save').append(icon('save'));
   $('btn-menu').append(icon('more'));
   $('btn-search').append(icon('search'));
+  $('btn-settings').append(icon('settings'));
   $('btn-new').append(icon('plus'));
   $('btn-refresh').append(icon('refresh'));
   renderTabs();
   void refreshContext();
-  const open = JSON.parse(store.get('open') ?? '[]') as string[];
+  // Older versions stored config-relative paths; map them into the virtual "/".
+  const abs = (p: string) => (p.startsWith('/') ? p : `/config/${p}`);
+  const open = (JSON.parse(store.get('open') ?? '[]') as string[]).map(abs);
   for (const p of open) await openFile(p).catch(() => {});
   const active = store.get('active');
-  if (active && files.has(active)) activate(active);
+  if (active && files.has(abs(active))) activate(abs(active));
+  // First visit (or nothing left open): start on configuration.yaml.
+  if (!files.size) await openFile(DEFAULT_FILE);
   await tree.render();
   if (!files.size) openDrawer();
 }
+initTooltips();
 void boot();

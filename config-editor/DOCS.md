@@ -11,3 +11,6 @@ Entity and action suggestions come from the running Home Assistant instance. If 
 ⋮ → Home Assistant tools → *Refresh*.
 
 See the project README for options, custom schemas and the security model.
+
+The explorer starts at `/` and opens `/config/configuration.yaml`. Use ⚙ Settings to hide folders or files from the explorer.
+Long-press (touch) or hover (desktop) any toolbar button for a description.

@@ -1,8 +1,10 @@
 import { isMap, isScalar, isSeq, parseDocument, visit, type Document, type Node, type Scalar, type YAMLMap } from 'yaml';
 import { ctx, type HaContext } from './context';
 import { haTags, isHaTag } from './tags';
-import { schemaFor } from '../schemas';
+import { CONFIG_ROOT_FILE, schemaFor } from '../schemas';
 import { validateSchema, type Schema, type SchemaError } from './jsonschema';
+import { findDirective, schemaContext, singleItemSchema } from './parseConfig';
+import { resolvePath } from './schemaWalk';
 
 export interface Problem {
   from: number;
@@ -127,13 +129,15 @@ function dirOf(path: string) {
 }
 
 function joinPath(dir: string, rel: string) {
-  const parts = (dir ? dir.split('/') : []).concat(rel.split('/'));
+  // An include starting with "/" is absolute within the editor's virtual root.
+  const absolute = rel.startsWith('/') || (dir.startsWith('/') && !rel.startsWith('/'));
+  const parts = (rel.startsWith('/') ? [] : dir ? dir.split('/') : []).concat(rel.split('/'));
   const out: string[] = [];
   for (const p of parts) {
     if (p === '..') out.pop();
     else if (p && p !== '.') out.push(p);
   }
-  return out.join('/');
+  return (absolute ? '/' : '') + out.join('/');
 }
 
 function checkTags(doc: Document, filePath: string, c: HaContext, out: Problem[]) {
@@ -217,9 +221,27 @@ export function validateYaml(text: string, filePath: string, c: HaContext = ctx)
   checkTags(doc, filePath, c, problems);
   checkEntities(doc, c, problems);
 
-  const match = schemaFor(filePath, c.customSchemas);
-  if (match && doc.contents) {
-    const errors = validateSchema(match.schema as Schema, doc.toJS({ maxAliasCount: -1 }));
+  const directive = findDirective(text);
+  if (directive) {
+    const range: [number, number] = [directive.from, Math.max(directive.from + 1, directive.to)];
+    if (directive.error) problems.push({ ...pos(range), severity: 'error', message: directive.error });
+    else if (!schemaContext(text, filePath)) {
+      const root = schemaFor(CONFIG_ROOT_FILE, c.customSchemas);
+      const known = root && resolvePath(root.schema as Schema, directive.segments.slice(0, 1));
+      problems.push({
+        ...pos(range),
+        severity: 'warning',
+        message: `parse_config: no schema known for "${directive.segments.join('.')}"${known ? '' : ` ("${directive.segments[0]}" is not in the configuration schema)`} — contents are not schema-checked`,
+      });
+    }
+  }
+
+  const sc = schemaContext(text, filePath);
+  if (sc && doc.contents) {
+    const data = doc.toJS({ maxAliasCount: -1 });
+    // A directive ending in [...] also accepts one list item instead of the whole list.
+    const schema = sc.trailingList && !Array.isArray(data) ? (singleItemSchema(sc) ?? sc.schema) : sc.schema;
+    const errors = validateSchema(sc.root as Schema, data, schema as Schema);
     const tagged = taggedPaths(doc);
     const seen = new Set<string>();
     for (const e of errors) {

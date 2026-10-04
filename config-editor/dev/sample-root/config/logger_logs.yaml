@@ -1,0 +1,4 @@
+# parse_config: logger.logs
+# This file is the value of `logger: logs:` in configuration.yaml.
+homeassistant.components.mqtt: debug
+custom_components.example: warning

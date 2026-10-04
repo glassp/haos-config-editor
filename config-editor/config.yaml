@@ -1,5 +1,5 @@
 name: Config Editor
-version: "0.2.0"
+version: "0.3.0"
 slug: config_editor
 description: Mobile-first file editor for your Home Assistant configuration, with HA-aware completion and validation.
 url: https://github.com/glassp/haos-config-editor
@@ -21,15 +21,32 @@ map:
   - type: homeassistant_config
     read_only: false
     path: /config
+  - type: share
+    read_only: false
+  - type: media
+    read_only: false
+  - type: ssl
+    read_only: true
+  - type: all_addon_configs
+    read_only: false
+  - type: addons
+    read_only: false
 options:
   read_only: false
-  show_hidden: false
+  allowed_roots:
+    - config
+    - share
+    - ssl
+    - media
+    - addon_configs
+    - addons
   allow_storage: false
   max_file_size_kb: 2048
   history_limit: 20
 schema:
   read_only: bool
-  show_hidden: bool
+  allowed_roots:
+    - str
   allow_storage: bool
   max_file_size_kb: int(64,20480)
   history_limit: int(0,200)

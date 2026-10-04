@@ -15,15 +15,25 @@ function globToRegExp(glob: string) {
   return new RegExp(`^${re}$`);
 }
 
+/** The file whose schema `parse_config` paths are resolved against. */
+export const CONFIG_ROOT_FILE = '/config/configuration.yaml';
+
+/** '/config/packages/a.yaml' -> 'packages/a.yaml'; paths outside /config are returned unchanged. */
+export const configRel = (path: string) => (path.startsWith('/config/') ? path.slice('/config/'.length) : path);
+
 /** User supplied schemas (from .ha-editor/schemas.json) win over the built in ones. */
 export function schemaFor(path: string, custom: Record<string, object> = {}): SchemaMatch | null {
+  const rel = configRel(path);
+  const inConfig = !rel.startsWith('/');
   for (const [glob, schema] of Object.entries(custom)) {
-    if (globToRegExp(glob).test(path)) return { schema, id: `custom:${glob}` };
+    const re = globToRegExp(glob);
+    if (re.test(rel) || re.test(path)) return { schema, id: `custom:${glob}` };
   }
-  const base = path.split('/').pop() ?? path;
-  if (path === 'automations.yaml' || base === 'automations.yaml') return { schema: automationsFile, id: 'automations' };
+  if (!inConfig) return null;
+  const base = rel.split('/').pop() ?? rel;
+  if (base === 'automations.yaml') return { schema: automationsFile, id: 'automations' };
   if (base === 'scripts.yaml') return { schema: scriptsFile, id: 'scripts' };
   if (base === 'scenes.yaml') return { schema: scenesFile, id: 'scenes' };
-  if (path === 'configuration.yaml' || path.startsWith('packages/')) return { schema: configurationFile, id: 'configuration' };
+  if (rel === 'configuration.yaml' || rel.startsWith('packages/')) return { schema: configurationFile, id: 'configuration' };
   return null;
 }

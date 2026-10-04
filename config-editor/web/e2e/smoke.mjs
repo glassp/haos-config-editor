@@ -11,7 +11,11 @@ page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
 const check = (cond, msg) => { if (!cond) { errors.push('FAIL: ' + msg); console.log('FAIL', msg); } else console.log('ok  ', msg); };
 
 await page.goto(process.env.URL ?? 'http://127.0.0.1:8099/');
-await page.waitForSelector('#drawer.open');
+await page.waitForFunction(() => document.title.includes('configuration.yaml'));
+check(true, 'opens /config/configuration.yaml by default');
+await page.tap('#btn-files');
+await page.waitForSelector('#drawer.open .tree-row:has-text("automations.yaml")');
+check((await page.locator('.tree-row[data-path="/config"]').count()) === 1 && (await page.locator('.tree-row[data-path="/share"]').count()) === 1, 'explorer root "/" lists /config and /share');
 await page.screenshot({ path: `${out}/1-drawer.png` });
 
 await page.tap('.tree-row:has-text("automations.yaml") .tree-main');
@@ -52,11 +56,11 @@ await page.keyboard.press('Escape');
 
 // copy / paste through the toolbar
 await page.keyboard.press('Control+a');
-await page.tap('button[title="Copy"]');
+await page.tap('button[data-tip^="Copy"]');
 const clip = await page.evaluate(() => navigator.clipboard.readText());
 check(clip.includes('brightness_pct') === false && clip.includes('service: light.turn_on'), 'toolbar copy writes selection to clipboard');
 await page.keyboard.press('Control+End');
-await page.tap('button[title="Paste"]');
+await page.tap('button[data-tip^="Paste"]');
 await page.waitForTimeout(300);
 await page.screenshot({ path: `${out}/4b-paste.png` });
 check((await page.textContent('.cm-content')).split('light.turn_on').length > 2, 'toolbar paste inserts clipboard text');

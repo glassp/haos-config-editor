@@ -3,11 +3,13 @@ import fs from 'node:fs';
 export interface Config {
   port: number;
   host: string;
-  configDir: string;
+  /** Real directory that backs the editor's virtual "/". */
+  rootDir: string;
+  /** Top-level folders of "/" the editor may enter. */
+  allowedRoots: string[];
   dataDir: string;
   publicDir: string;
   readOnly: boolean;
-  showHidden: boolean;
   allowStorage: boolean;
   maxFileSize: number;
   historyLimit: number;
@@ -19,11 +21,13 @@ export interface Config {
 
 interface AddonOptions {
   read_only?: boolean;
-  show_hidden?: boolean;
+  allowed_roots?: string[];
   allow_storage?: boolean;
   max_file_size_kb?: number;
   history_limit?: number;
 }
+
+export const DEFAULT_ROOTS = ['config', 'share', 'ssl', 'media', 'addon_configs', 'addons'];
 
 function readOptions(file: string): AddonOptions {
   try {
@@ -45,11 +49,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   return {
     port: Number(env.PORT ?? 8099),
     host: env.HOST ?? (addon ? '0.0.0.0' : '127.0.0.1'),
-    configDir: env.CONFIG_DIR ?? (addon ? '/config' : './.dev-config'),
+    rootDir: env.ROOT_DIR ?? (addon ? '/' : './.dev-root'),
+    allowedRoots: env.ALLOWED_ROOTS?.split(',').map((x) => x.trim()).filter(Boolean) ?? opts.allowed_roots ?? DEFAULT_ROOTS,
     dataDir,
     publicDir: env.PUBLIC_DIR ?? new URL('../public', import.meta.url).pathname,
     readOnly: opts.read_only ?? env.READ_ONLY === '1',
-    showHidden: opts.show_hidden ?? false,
     allowStorage: opts.allow_storage ?? false,
     maxFileSize: (opts.max_file_size_kb ?? 2048) * 1024,
     historyLimit: opts.history_limit ?? 20,

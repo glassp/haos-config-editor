@@ -3,6 +3,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import type { Config } from './config.js';
 import { HttpError, type PathResolver } from './paths.js';
+import type { SettingsStore } from './settings.js';
 
 export interface Entry {
   name: string;
@@ -12,28 +13,22 @@ export interface Entry {
   mtime: number;
 }
 
-const ALWAYS_HIDDEN = new Set(['__pycache__', 'deps', '.cloud', 'tts']);
-const HIDDEN_SUFFIX = ['.db', '.db-shm', '.db-wal', '.log', '.log.1', '.pyc'];
+/** Folders never walked by search/index (huge and uninteresting); the explorer still lists them. */
+const SKIP_WALK = new Set(['deps', '__pycache__', '.git', 'node_modules', '.cache']);
+const STORAGE = '/config/.storage';
 
-export function createFiles(cfg: Config, resolver: PathResolver) {
+export function createFiles(cfg: Config, resolver: PathResolver, settings: SettingsStore) {
   const { resolve } = resolver;
 
-  function isHidden(name: string) {
-    if (ALWAYS_HIDDEN.has(name)) return true;
-    if (HIDDEN_SUFFIX.some((s) => name.endsWith(s))) return true;
-    if (name === '.storage') return !cfg.allowStorage;
-    return !cfg.showHidden && name.startsWith('.');
-  }
-
   function guardStorage(rel: string) {
-    if (!cfg.allowStorage && (rel === '.storage' || rel.startsWith('.storage/'))) {
+    if (!cfg.allowStorage && (rel === STORAGE || rel.startsWith(STORAGE + '/'))) {
       throw new HttpError(403, '.storage is protected (enable allow_storage to edit it)');
     }
   }
 
   function guardWrite(rel: string) {
     if (cfg.readOnly) throw new HttpError(403, 'Editor is in read-only mode');
-    if (rel === '') throw new HttpError(400, 'Cannot modify the config root');
+    if (rel.split('/').filter(Boolean).length < 2) throw new HttpError(400, 'Cannot modify a top-level folder');
     guardStorage(rel);
   }
 
@@ -49,25 +44,29 @@ export function createFiles(cfg: Config, resolver: PathResolver) {
     throw e;
   };
 
-  async function list(rel: string): Promise<Entry[]> {
-    const { abs, rel: r } = await resolve(rel);
+  /** Raw directory listing, no visibility filtering. */
+  async function listRaw(rel: string): Promise<Entry[]> {
+    const { abs, rel: r, mount } = await resolve(rel);
     guardStorage(r);
     try {
-      const dirents = await fs.readdir(abs, { withFileTypes: true });
+      let names: string[];
+      if (mount === null) {
+        names = resolver.allowedRoots;
+      } else {
+        names = (await fs.readdir(abs, { withFileTypes: true })).map((d) => d.name);
+      }
       const out: Entry[] = [];
-      for (const d of dirents) {
-        if (isHidden(d.name)) continue;
-        const full = path.join(abs, d.name);
+      for (const name of names) {
         let st;
         try {
-          st = await fs.stat(full); // follows symlinks; broken links are skipped
+          st = await fs.stat(path.join(abs, name)); // follows symlinks; broken links are skipped
         } catch {
           continue;
         }
         if (!st.isFile() && !st.isDirectory()) continue;
         out.push({
-          name: d.name,
-          path: r ? `${r}/${d.name}` : d.name,
+          name,
+          path: r === '/' ? `/${name}` : `${r}/${name}`,
           type: st.isDirectory() ? 'dir' : 'file',
           size: st.size,
           mtime: st.mtimeMs,
@@ -78,6 +77,11 @@ export function createFiles(cfg: Config, resolver: PathResolver) {
     } catch (e) {
       return mapErr(e);
     }
+  }
+
+  /** What the explorer shows: the raw listing minus paths hidden in the settings. */
+  async function list(rel: string): Promise<Entry[]> {
+    return (await listRaw(rel)).filter((e) => settings.isVisible(e.path));
   }
 
   async function read(rel: string) {
@@ -228,49 +232,72 @@ export function createFiles(cfg: Config, resolver: PathResolver) {
     }
   }
 
-  /** Walk the tree (bounded) for filename and content search. */
-  async function search(query: string, opts: { content: boolean; limit?: number }) {
-    const q = query.toLowerCase();
-    const limit = opts.limit ?? 100;
-    const results: { path: string; line?: number; text?: string }[] = [];
+  /**
+   * Walk the tree (bounded). `respectVisibility` is true for user facing search and false for
+   * the internal index used by validation, which must see hidden files too.
+   */
+  async function walkFiles(
+    start: string,
+    opts: { respectVisibility: boolean; limit: number; onFile: (e: Entry) => Promise<void> | void },
+  ) {
     let visited = 0;
-
+    let count = 0;
     async function walk(rel: string) {
-      if (results.length >= limit || visited > 20000) return;
+      if (count >= opts.limit || visited > 20000) return;
       let entries: Entry[];
       try {
-        entries = await list(rel);
+        entries = opts.respectVisibility ? await list(rel) : await listRaw(rel);
       } catch {
         return;
       }
       for (const e of entries) {
-        if (results.length >= limit) return;
+        if (count >= opts.limit) return;
         visited++;
         if (e.type === 'dir') {
-          await walk(e.path);
-          continue;
+          if (!SKIP_WALK.has(e.name)) await walk(e.path);
+        } else {
+          count++;
+          await opts.onFile(e);
         }
+      }
+    }
+    await walk(start);
+  }
+
+  async function search(query: string, opts: { content: boolean; limit?: number }) {
+    const q = query.toLowerCase();
+    const limit = opts.limit ?? 100;
+    const results: { path: string; line?: number; text?: string }[] = [];
+    await walkFiles('/', {
+      respectVisibility: true,
+      limit: 20000,
+      onFile: async (e) => {
+        if (results.length >= limit) return;
         if (e.name.toLowerCase().includes(q)) results.push({ path: e.path });
         if (opts.content && e.size <= 512 * 1024) {
           try {
             const { content } = await read(e.path);
             const lines = content.split('\n');
             for (let i = 0; i < lines.length && results.length < limit; i++) {
-              if (lines[i].toLowerCase().includes(q)) {
-                results.push({ path: e.path, line: i + 1, text: lines[i].trim().slice(0, 200) });
-              }
+              if (lines[i].toLowerCase().includes(q)) results.push({ path: e.path, line: i + 1, text: lines[i].trim().slice(0, 200) });
             }
           } catch {
             /* binary or unreadable */
           }
         }
-      }
-    }
-    await walk('');
+      },
+    });
     return results;
   }
 
-  return { list, read, write, create, rename, copy, remove, search, listHistory, readHistory };
+  /** Every file under /config, hidden or not: for !include completion and validation. */
+  async function index(limit = 5000) {
+    const paths: string[] = [];
+    await walkFiles('/config', { respectVisibility: false, limit, onFile: (e) => void paths.push(e.path) });
+    return paths;
+  }
+
+  return { list, index, read, write, create, rename, copy, remove, search, listHistory, readHistory };
 }
 
 export type Files = ReturnType<typeof createFiles>;

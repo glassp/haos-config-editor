@@ -32,6 +32,14 @@ describe('validateYaml', () => {
     expect(msgs('automation: !include missing.yaml\n', 'configuration.yaml')[0]).toMatch(/does not exist/);
     expect(msgs('x: !include a.yaml\n', 'packages/b.yaml')).toEqual([]);
   });
+  it('resolves includes in the absolute virtual root', () => {
+    const c = base({ paths: new Set(['/config/configuration.yaml', '/config/automations.yaml', '/config/packages/a.yaml', '/share/x.yaml']) });
+    expect(msgs('automation: !include automations.yaml\n', '/config/configuration.yaml', c)).toEqual([]);
+    expect(msgs('x: !include a.yaml\n', '/config/packages/b.yaml', c)).toEqual([]);
+    expect(msgs('x: !include ../automations.yaml\n', '/config/packages/b.yaml', c)).toEqual([]);
+    expect(msgs('x: !include /share/x.yaml\n', '/config/configuration.yaml', c)).toEqual([]);
+    expect(msgs('x: !include nope.yaml\n', '/config/configuration.yaml', c)[0]).toMatch(/"\/config\/nope.yaml" does not exist/);
+  });
   it('flags unknown entities and services', () => {
     const t = '- alias: a\n  trigger:\n    - platform: state\n      entity_id: light.nope\n  action:\n    - service: light.explode\n';
     const m = msgs(t, 'automations.yaml');

@@ -11,6 +11,11 @@ export function h<K extends keyof HTMLElementTagNameMap>(
     if (k === 'class') el.className = String(v);
     else if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2), v as EventListener);
     else if (k === 'html') el.innerHTML = String(v);
+    else if (k === 'tip') {
+      // Tooltip text (hover on desktop, long-press on touch); doubles as the accessible name.
+      el.setAttribute('data-tip', String(v));
+      if (!('aria-label' in attrs)) el.setAttribute('aria-label', String(v));
+    }
     else el.setAttribute(k, v === true ? '' : String(v));
   }
   for (const c of children) if (c) el.append(c);
@@ -47,6 +52,9 @@ const P: Record<string, string> = {
   trash: 'M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14',
   edit: 'M4 20h4L19 9l-4-4L4 16z',
   pin: 'M12 17v5M8 3h8l-1 7 3 3H6l3-3z',
+  settings: 'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2-1.2L14.2 3h-4l-.4 2.6a7 7 0 0 0-2 1.2l-2.3-.9-2 3.4 2 1.5a7 7 0 0 0 0 2.4l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 2 1.2l.4 2.6h4l.4-2.6a7 7 0 0 0 2-1.2l2.3.9 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z',
+  back: 'M15 6l-6 6 6 6',
+  eye: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',
 };
 
 export function icon(name: string, size = 20): SVGSVGElement {

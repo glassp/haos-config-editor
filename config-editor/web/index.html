@@ -10,16 +10,16 @@
   <body>
     <div id="app">
       <header id="topbar">
-        <button id="btn-files" class="icon-btn" aria-label="Files"></button>
-        <button id="doc-title" class="doc-title" aria-label="Open tabs" hidden>
+        <button id="btn-files" class="icon-btn" aria-label="Files" data-tip="Show or hide the file explorer"></button>
+        <button id="doc-title" class="doc-title" aria-label="Open tabs" data-tip="Switch between open files" hidden>
           <span class="doc-name"><span id="title-dot" class="dot" hidden></span><span id="title-name"></span><span id="title-pin" hidden></span></span>
           <span id="title-path" class="doc-path"></span>
         </button>
         <div id="tabstrip" class="tabstrip" role="tablist"></div>
-        <button id="btn-problems" class="chip" aria-label="Problems" hidden></button>
-        <button id="btn-tabs" class="tabs-btn" aria-label="All tabs" hidden><span id="tabs-count">0</span></button>
-        <button id="btn-save" class="icon-btn" aria-label="Save"></button>
-        <button id="btn-menu" class="icon-btn" aria-label="Menu"></button>
+        <button id="btn-problems" class="chip" aria-label="Problems" data-tip="Errors and warnings in this file — tap for the list" hidden></button>
+        <button id="btn-tabs" class="tabs-btn" aria-label="All tabs" data-tip="Show all open tabs" hidden><span id="tabs-count">0</span></button>
+        <button id="btn-save" class="icon-btn" aria-label="Save" data-tip="Save this file (Ctrl/Cmd+S)"></button>
+        <button id="btn-menu" class="icon-btn" aria-label="Menu" data-tip="More actions: find, history, copy, Home Assistant tools"></button>
       </header>
       <main id="editor">
         <div id="empty" class="empty">
@@ -33,9 +33,10 @@
         <div class="drawer-head">
           <strong>Files</strong>
           <span class="grow"></span>
-          <button id="btn-search" class="icon-btn" aria-label="Search"></button>
-          <button id="btn-new" class="icon-btn" aria-label="New file"></button>
-          <button id="btn-refresh" class="icon-btn" aria-label="Refresh"></button>
+          <button id="btn-settings" class="icon-btn" aria-label="Settings" data-tip="Open settings (explorer visibility, editor options)"></button>
+          <button id="btn-search" class="icon-btn" aria-label="Search" data-tip="Search file names and contents"></button>
+          <button id="btn-new" class="icon-btn" aria-label="New file" data-tip="Create a new file or folder"></button>
+          <button id="btn-refresh" class="icon-btn" aria-label="Refresh" data-tip="Reload the file list, entities and services"></button>
         </div>
         <div id="tree"></div>
       </aside>

@@ -4,15 +4,16 @@ import type { Config } from './config.js';
 import { createFiles } from './files.js';
 import { createHaClient, type HaClient } from './ha.js';
 import { HttpError, createResolver } from './paths.js';
+import { createSettings, type SettingsStore } from './settings.js';
 
 const str = (v: unknown, name: string): string => {
   if (typeof v !== 'string') throw new HttpError(400, `Missing ${name}`);
   return v;
 };
 
-export function createApp(cfg: Config, ha: HaClient = createHaClient(cfg)) {
-  const resolver = createResolver(cfg.configDir);
-  const files = createFiles(cfg, resolver);
+export function createApp(cfg: Config, ha: HaClient = createHaClient(cfg), settings: SettingsStore = createSettings(cfg.dataDir)) {
+  const resolver = createResolver(cfg.rootDir, cfg.allowedRoots);
+  const files = createFiles(cfg, resolver, settings);
   const app = express();
   app.disable('x-powered-by');
 
@@ -56,7 +57,7 @@ export function createApp(cfg: Config, ha: HaClient = createHaClient(cfg)) {
     maxFileSize: cfg.maxFileSize,
   })));
 
-  api.get('/tree', wrap(async (req) => ({ entries: await files.list(String(req.query.path ?? '')) })));
+  api.get('/tree', wrap(async (req) => ({ entries: await files.list(String(req.query.path ?? '/')) })));
   api.get('/file', wrap(async (req) => files.read(str(req.query.path, 'path'))));
   api.put('/file', wrap(async (req) => {
     const { path, content, expectedMtime } = req.body ?? {};
@@ -81,15 +82,18 @@ export function createApp(cfg: Config, ha: HaClient = createHaClient(cfg)) {
   }));
   // Flat list of every visible file path, for !include completion/validation and quick open.
   api.get('/index', wrap(async () => ({
-    paths: (await files.search('', { content: false, limit: 5000 })).map((r) => r.path),
+    paths: await files.index(),
   })));
+
+  api.get('/settings', wrap(async () => settings.get()));
+  api.put('/settings', wrap(async (req) => settings.save(req.body)));
   api.get('/history', wrap(async (req) => ({ versions: await files.listHistory(str(req.query.path, 'path')) })));
   api.get('/history/version', wrap(async (req) => files.readHistory(str(req.query.path, 'path'), str(req.query.id, 'id'))));
 
   // Names (never values) from secrets.yaml, for completion and validation.
   api.get('/secrets', wrap(async () => {
     try {
-      const { abs } = await resolver.resolve('secrets.yaml');
+      const { abs } = await resolver.resolve('/config/secrets.yaml');
       const text = await fs.readFile(abs, 'utf8');
       const keys = [...text.matchAll(/^([A-Za-z0-9_.-]+)\s*:/gm)].map((m) => m[1]);
       return { keys };
@@ -98,15 +102,15 @@ export function createApp(cfg: Config, ha: HaClient = createHaClient(cfg)) {
     }
   }));
 
-  // Optional user schemas: <config>/.ha-editor/schemas.json maps globs to schema files.
+  // Optional user schemas: /config/.ha-editor/schemas.json maps globs to schema files.
   api.get('/schemas', wrap(async () => {
     const out: Record<string, unknown> = {};
     try {
-      const { abs } = await resolver.resolve('.ha-editor/schemas.json');
+      const { abs } = await resolver.resolve('/config/.ha-editor/schemas.json');
       const map = JSON.parse(await fs.readFile(abs, 'utf8')) as Record<string, string>;
       for (const [glob, file] of Object.entries(map)) {
         try {
-          out[glob] = JSON.parse((await files.read(file)).content);
+          out[glob] = JSON.parse((await files.read(file.startsWith('/') ? file : `/config/${file}`)).content);
         } catch {
           /* skip unreadable schema */
         }

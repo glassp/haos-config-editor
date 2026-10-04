@@ -26,9 +26,10 @@ function deepEqual(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
-export function validateSchema(root: Schema, data: unknown): SchemaError[] {
+/** Validate `data` against `schema` (default: the root). `$ref`s always resolve against `root`. */
+export function validateSchema(root: Schema, data: unknown, schema: Schema = root): SchemaError[] {
   const errors: SchemaError[] = [];
-  walk(root, data, [], errors, root, 0);
+  walk(schema, data, [], errors, root, 0);
   return errors;
 }
 

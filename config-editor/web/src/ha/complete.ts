@@ -1,8 +1,9 @@
 import { autocompletion, completionKeymap, type Completion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete';
 import { Facet } from '@codemirror/state';
 import { ctx, type HaContext } from './context';
-import { schemaFor } from '../schemas';
-import { descend, enumValues, propertiesOf } from './schemaWalk';
+import { CONFIG_ROOT_FILE, configRel, schemaFor } from '../schemas';
+import { descend, enumValues, propertiesOf, resolvePath } from './schemaWalk';
+import { fullPath, parseDirectivePath, schemaContext } from './parseConfig';
 import { HA_TAG_NAMES } from './tags';
 import { ITEM, pathFor, parseLine, siblingKeys, siblingScalars, type PathPart } from './yamlPath';
 
@@ -84,6 +85,25 @@ export function yamlCompletions(context: CompletionContext): CompletionResult | 
   const lineIdx = line.number - 1;
   const c = ctx;
 
+  // --- `# parse_config: a.b` paths --------------------------------------------------
+  const dm = /^[ \t]*#[ \t]*parse_config[ \t]*:[ \t]*([\w.-]*)$/.exec(before);
+  if (dm) {
+    const rootSchema = schemaFor(CONFIG_ROOT_FILE, c.customSchemas)?.schema as never;
+    if (!rootSchema) return null;
+    const lastDot = dm[1].lastIndexOf('.');
+    const head = lastDot === -1 ? [] : parseDirectivePath(dm[1].slice(0, lastDot)).segments;
+    const node = head.length ? resolvePath(rootSchema, head) : rootSchema;
+    if (!node) return null;
+    let props = propertiesOf(descend(rootSchema, [], node as never), rootSchema, {});
+    if (!props.size) props = propertiesOf(descend(rootSchema, [ITEM], node as never), rootSchema, {});
+    const partial = dm[1].slice(lastDot + 1);
+    return {
+      from: pos - partial.length,
+      options: [...props.entries()].map(([k, p]) => ({ label: k, type: 'property', info: p.description })),
+      validFor: /^[\w-]*$/,
+    };
+  }
+
   // --- tags: !secret, !include ... -------------------------------------------------
   const tagArg = /(!(?:secret|include\w*|env_var|input))\s+([^\s#]*)$/.exec(before);
   if (tagArg) {
@@ -148,7 +168,7 @@ export function yamlCompletions(context: CompletionContext): CompletionResult | 
     const present = siblingKeys(lines, lineIdx);
     return {
       from: m.from,
-      options: keyOptions(filePath, path, at, lines, siblings).filter((o) => !present.has(o.label)),
+      options: keyOptions(filePath, state.doc.toString(), path, at, lines, siblings).filter((o) => !present.has(o.label)),
       validFor: /^[\w-]*$/,
     };
   }
@@ -170,12 +190,12 @@ export function yamlCompletions(context: CompletionContext): CompletionResult | 
     return { from: m.from, options: JINJA.map(([label, apply]) => ({ label, type: 'function', apply: snippetLike(apply) })), validFor: /^\w*$/ };
   }
   // enum / boolean values from the schema
-  const schema = schemaFor(filePath, c.customSchemas);
-  if (schema) {
+  const sc = schemaContext(state.doc.toString(), filePath);
+  if (sc) {
     const { path } = pathFor(lines, lineIdx);
-    const nodes = descend(schema.schema as never, path);
-    const props = propertiesOf(nodes, schema.schema as never, siblingScalars(lines, lineIdx));
-    const vals = enumValues(props.get(key) ? [props.get(key)!.schema] : [], schema.schema as never);
+    const nodes = descend(sc.root as never, fullPath(sc, path));
+    const props = propertiesOf(nodes, sc.root as never, siblingScalars(lines, lineIdx));
+    const vals = enumValues(props.get(key) ? [props.get(key)!.schema] : [], sc.root as never);
     if (vals.length && /^\s*[\w.-]*$/.test(valueStart)) {
       return { from, options: vals.map((v) => ({ label: v, type: 'enum' })), validFor: /^[\w.-]*$/ };
     }
@@ -193,10 +213,10 @@ function snippetLike(t: string) {
   };
 }
 
-function keyOptions(filePath: string, path: PathPart[], at: number[], lines: string[], siblings: Record<string, string>): Completion[] {
+function keyOptions(filePath: string, text: string, path: PathPart[], at: number[], lines: string[], siblings: Record<string, string>): Completion[] {
   const c = ctx;
   const out: Completion[] = [];
-  const schema = schemaFor(filePath, c.customSchemas);
+  const sc = schemaContext(text, filePath);
   const key = lastKey(path);
 
   // service data: fields come from the live service registry
@@ -209,15 +229,16 @@ function keyOptions(filePath: string, path: PathPart[], at: number[], lines: str
     for (const k of ['entity_id', 'device_id', 'area_id', 'floor_id', 'label_id']) out.push({ label: k, type: 'property', apply: `${k}: ` });
   }
 
-  if (schema) {
-    const nodes = descend(schema.schema as never, path);
-    for (const [k, p] of propertiesOf(nodes, schema.schema as never, siblings)) {
+  if (sc) {
+    const nodes = descend(sc.root as never, fullPath(sc, path));
+    for (const [k, p] of propertiesOf(nodes, sc.root as never, siblings)) {
       out.push({ label: k, type: 'property', info: p.description, apply: `${k}: ` });
     }
   }
 
   // top level of configuration.yaml / packages: integrations that are loaded in HA
-  if (path.length === 0 && (filePath === 'configuration.yaml' || filePath.startsWith('packages/'))) {
+  const rel = configRel(filePath);
+  if (path.length === 0 && !sc?.prefix.length && (rel === 'configuration.yaml' || rel.startsWith('packages/'))) {
     const seen = new Set(out.map((o) => o.label));
     for (const comp of c.components) {
       if (comp.includes('.') || seen.has(comp)) continue;
