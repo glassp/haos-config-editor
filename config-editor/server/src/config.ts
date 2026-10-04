@@ -34,7 +34,8 @@ function readOptions(file: string): AddonOptions {
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
-  const addon = Boolean(env.SUPERVISOR_TOKEN);
+  // ADDON is set by run.sh; /data/options.json exists in every add-on container.
+  const addon = Boolean(env.SUPERVISOR_TOKEN) || env.ADDON === '1' || fs.existsSync('/data/options.json');
   const dataDir = env.DATA_DIR ?? (addon ? '/data' : './.dev-data');
   const opts = readOptions(env.OPTIONS_FILE ?? `${dataDir}/options.json`);
 
